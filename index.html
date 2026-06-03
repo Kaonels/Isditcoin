@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>isditcoin.xyz — Signal Engine</title>
+<title>ditcoin — Signal Engine ₿</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -13,148 +13,200 @@ button:hover:not(:disabled){filter:brightness(1.12)}
 </style>
 </head>
 <body>
-<div id="root" style="max-width:880px;margin:0 auto;padding:18px"></div>
+<div id="root" style="max-width:900px;margin:0 auto;padding:18px"></div>
 <script>
 const C={bg:"#060b13",bg2:"#0d1826",bg3:"#13283f",panel:"#0f1f33",border:"#1d3650",
 green:"#22d182",red:"#ff4d6a",gold:"#f7931a",goldL:"#ffb74d",blue:"#3a9bdc",
 purple:"#9b6dff",text:"#e6edf7",muted:"#6a83a3",dim:"#162840",yellow:"#ffd24d"};
 
-// Binance public API works from browser (no CORS block, no key needed)
 const COINS=[
- {sym:"BTC", pair:"BTCUSDT", name:"Bitcoin"},
- {sym:"ETH", pair:"ETHUSDT", name:"Ethereum"},
- {sym:"SOL", pair:"SOLUSDT", name:"Solana"},
- {sym:"BNB", pair:"BNBUSDT", name:"BNB"},
- {sym:"XRP", pair:"XRPUSDT", name:"XRP"},
- {sym:"AVAX",pair:"AVAXUSDT",name:"Avalanche"},
+ {sym:"BTC",pair:"BTCUSDT",name:"Bitcoin"},{sym:"ETH",pair:"ETHUSDT",name:"Ethereum"},
+ {sym:"SOL",pair:"SOLUSDT",name:"Solana"},{sym:"BNB",pair:"BNBUSDT",name:"BNB"},
+ {sym:"XRP",pair:"XRPUSDT",name:"XRP"},{sym:"AVAX",pair:"AVAXUSDT",name:"Avalanche"},
 ];
-
-// Multiple Binance endpoints + proxy fallback
 const BASES=["https://api.binance.com","https://api1.binance.com","https://data-api.binance.vision"];
 async function getKlines(pair,interval,limit){
- for(const base of BASES){
-   try{
-     const url=`${base}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
-     const r=await fetch(url,{signal:AbortSignal.timeout(7000)});
-     if(r.ok){
-       const d=await r.json();
-       return d.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));
-     }
-   }catch(e){}
- }
- // proxy fallback
- try{
-   const url=`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
-   const r=await fetch("https://corsproxy.io/?"+encodeURIComponent(url),{signal:AbortSignal.timeout(8000)});
-   if(r.ok){const d=await r.json();return d.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));}
- }catch(e){}
+ for(const base of BASES){try{const u=`${base}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;const r=await fetch(u,{signal:AbortSignal.timeout(7000)});if(r.ok){const d=await r.json();return d.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));}}catch(e){}}
+ try{const u=`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;const r=await fetch("https://corsproxy.io/?"+encodeURIComponent(u),{signal:AbortSignal.timeout(8000)});if(r.ok){const d=await r.json();return d.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));}}catch(e){}
  return null;
 }
+function ema(v,p){const k=2/(p+1);let e=v[0];const o=[e];for(let i=1;i<v.length;i++){e=v[i]*k+e*(1-k);o.push(e);}return o;}
+function rsi(c,p=14){if(c.length<p+1)return 50;let g=0,l=0;for(let i=c.length-p;i<c.length;i++){const d=c[i]-c[i-1];if(d>=0)g+=d;else l-=d;}const aG=g/p,aL=l/p;if(aL===0)return 100;return Math.round(100-100/(1+aG/aL));}
+function atr(c,p=14){if(c.length<p+1)return c[c.length-1].close*0.02;let s=0;for(let i=c.length-p;i<c.length;i++){s+=Math.max(c[i].high-c[i].low,Math.abs(c[i].high-c[i-1].close),Math.abs(c[i].low-c[i-1].close));}return s/p;}
+function macd(c){const e12=ema(c,12),e26=ema(c,26);const line=e12.map((v,i)=>v-e26[i]);const sig=ema(line.slice(26),9);const m=line[line.length-1],sg=sig[sig.length-1];return{hist:m-sg,bullish:m>sg};}
 
-function ema(values,period){const k=2/(period+1);let e=values[0];const out=[e];for(let i=1;i<values.length;i++){e=values[i]*k+e*(1-k);out.push(e);}return out;}
-function rsi(closes,period=14){if(closes.length<period+1)return 50;let g=0,l=0;for(let i=closes.length-period;i<closes.length;i++){const d=closes[i]-closes[i-1];if(d>=0)g+=d;else l-=d;}const aG=g/period,aL=l/period;if(aL===0)return 100;return Math.round(100-100/(1+aG/aL));}
-function atr(c,period=14){if(c.length<period+1)return c[c.length-1].close*0.02;let s=0;for(let i=c.length-period;i<c.length;i++){s+=Math.max(c[i].high-c[i].low,Math.abs(c[i].high-c[i-1].close),Math.abs(c[i].low-c[i-1].close));}return s/period;}
+// Higher-timeframe trend (4h EMA50) for confluence filter
+function trendDir(closes){const e50=ema(closes,50);const price=closes[closes.length-1];return price>e50[e50.length-1]?"UP":"DOWN";}
 
-function analyze(candles,tf){
- const closes=candles.map(c=>c.close);
- const price=closes[closes.length-1];
- const r=rsi(closes,14);
- const eF=ema(closes,9),eS=ema(closes,21);
+function analyze(candles,htfTrend,tf){
+ const closes=candles.map(c=>c.close);const price=closes[closes.length-1];
+ const r=rsi(closes,14);const eF=ema(closes,9),eS=ema(closes,21),e50=ema(closes,50);
  const ef=eF[eF.length-1],es=eS[eS.length-1],efP=eF[eF.length-2],esP=eS[eS.length-2];
- const a=atr(candles,14);
- const vols=candles.map(c=>c.vol);
- const rv=vols[vols.length-1],av=vols.slice(-21,-1).reduce((s,v)=>s+v,0)/20;
+ const a=atr(candles,14);const m=macd(closes);
+ const vols=candles.map(c=>c.vol),rv=vols[vols.length-1],av=vols.slice(-21,-1).reduce((s,v)=>s+v,0)/20;
  const volSpike=rv>av*1.4;
- // trend strength via EMA distance
- const trendPct=((ef-es)/es*100);
+ const localTrend=price>e50[e50.length-1]?"UP":"DOWN";
+ const atrPct=a/price*100;
 
  let score=0;const reasons=[];
  if(r<30){score+=2;reasons.push("RSI "+r+" sobrevendido");}
  else if(r>70){score-=2;reasons.push("RSI "+r+" sobrecomprado");}
  else reasons.push("RSI "+r);
- const crossUp=efP<=esP&&ef>es, crossDown=efP>=esP&&ef<es;
- if(crossUp){score+=2;reasons.push("EMA9 cruzó sobre EMA21 (alcista)");}
- else if(crossDown){score-=2;reasons.push("EMA9 cruzó bajo EMA21 (bajista)");}
- else if(ef>es){score+=1;reasons.push("Tendencia alcista ("+trendPct.toFixed(1)+"%)");}
- else{score-=1;reasons.push("Tendencia bajista ("+trendPct.toFixed(1)+"%)");}
- if(volSpike){score+=(score>=0?1:-1);reasons.push("Volumen alto confirma");}
+ const crossUp=efP<=esP&&ef>es,crossDown=efP>=esP&&ef<es;
+ if(crossUp){score+=2;reasons.push("Cruce EMA alcista");}
+ else if(crossDown){score-=2;reasons.push("Cruce EMA bajista");}
+ else if(ef>es){score+=1;reasons.push("EMA en uptrend");}else{score-=1;reasons.push("EMA en downtrend");}
+ if(m.bullish){score+=1;reasons.push("MACD alcista");}else{score-=1;reasons.push("MACD bajista");}
+ if(volSpike){score+=(score>=0?1:-1);reasons.push("Volumen confirma");}
 
  let dir="NEUTRAL";
  if(score>=3)dir="LONG";else if(score<=-3)dir="SHORT";
- const mult=tf==="scalp"?1.0:2.0;
- let tp=null,sl=null;
- if(dir==="LONG"){sl=price-a*1.0*mult;tp=price+a*2.0*mult;}
- if(dir==="SHORT"){sl=price+a*1.0*mult;tp=price-a*2.0*mult;}
- // confidence label
- const absScore=Math.abs(score);
- const conf=absScore>=4?"Alta":absScore>=3?"Media":"Baja";
- return {dir,score,reasons,price,tp,sl,rsi:r,conf};
+
+ // Trend confluence: does signal agree with higher timeframe?
+ let withTrend=true,trendNote="";
+ if(dir==="LONG"&&htfTrend==="DOWN"){withTrend=false;trendNote="⚠ Contra-tendencia (HTF bajista) — mayor riesgo";}
+ else if(dir==="SHORT"&&htfTrend==="UP"){withTrend=false;trendNote="⚠ Contra-tendencia (HTF alcista) — mayor riesgo";}
+ else if(dir!=="NEUTRAL"){trendNote="✓ A favor de la tendencia mayor";}
+
+ // low volatility filter
+ const deadMarket=atrPct<0.4;
+ if(deadMarket&&dir!=="NEUTRAL")reasons.push("Volatilidad baja — setup débil");
+
+ const mult=tf==="scalp"?1.0:2.0;let tp=null,sl=null,rr=null;
+ if(dir==="LONG"){sl=price-a*1.0*mult;tp=price+a*2.0*mult;rr=2;}
+ if(dir==="SHORT"){sl=price+a*1.0*mult;tp=price-a*2.0*mult;rr=2;}
+
+ const absS=Math.abs(score);
+ let conf=absS>=5?"Alta":absS>=4?"Media-Alta":absS>=3?"Media":"Baja";
+ if(dir!=="NEUTRAL"&&!withTrend)conf="Riesgo (contra-tendencia)";
+ if(dir!=="NEUTRAL"&&deadMarket)conf="Baja (mercado lento)";
+
+ return {dir,score,reasons,price,tp,sl,rr,rsi:r,conf,withTrend,trendNote,htfTrend};
 }
 function liqPrice(e,dir,lev){const m=e*(1/lev)*0.95;return dir==="LONG"?e-m:e+m;}
 const fmtP=p=>p==null?"—":p>=1000?p.toLocaleString(undefined,{maximumFractionDigits:0}):p>=1?p.toFixed(2):p.toFixed(4);
 
-let state={tf:"scalp",lev:3,signals:[],loading:false,updated:null,err:null};
+
+// ─── Market context: Fear & Greed + crypto news (real, free sources) ────────
+async function getFearGreed(){
+ try{const r=await fetch("https://api.alternative.me/fng/?limit=1",{signal:AbortSignal.timeout(6000)});
+   if(r.ok){const d=await r.json();const v=d.data[0];return {value:+v.value,label:v.value_classification};}}catch(e){}
+ return null;
+}
+async function getNews(){
+ const feeds=["https://cointelegraph.com/rss","https://www.coindesk.com/arc/outboundfeeds/rss/"];
+ const out=[];
+ for(const fe of feeds){
+   try{
+     const r=await fetch("https://api.allorigins.win/raw?url="+encodeURIComponent(fe),{signal:AbortSignal.timeout(7000)});
+     if(r.ok){const x=await r.text();const doc=new DOMParser().parseFromString(x,"text/xml");
+       doc.querySelectorAll("item").forEach((n,i)=>{if(i<4){const t=n.querySelector("title");const l=n.querySelector("link");if(t)out.push({title:t.textContent.trim(),link:l?l.textContent.trim():"#",src:fe.includes("cointele")?"Cointelegraph":"CoinDesk"});}});
+     }
+   }catch(e){}
+ }
+ return out.slice(0,8);
+}
+
+let state={tf:"scalp",lev:3,filter:"both",signals:[],loading:false,updated:null,err:null,fng:null,news:[]};
 
 async function scan(){
  state.loading=true;state.err=null;render();
  const interval=state.tf==="scalp"?"15m":"4h";
  const results=[];let failed=0;
  for(const coin of COINS){
-   const candles=await getKlines(coin.pair,interval,50);
+   const candles=await getKlines(coin.pair,interval,80);
+   // higher timeframe for trend confluence
+   const htf=await getKlines(coin.pair,"4h",60);
    if(!candles){failed++;continue;}
-   results.push({coin,sig:analyze(candles,state.tf)});
+   const htfTrend=htf?trendDir(htf.map(c=>c.close)):"UP";
+   results.push({coin,sig:analyze(candles,htfTrend,state.tf)});
  }
  state.signals=results;
- state.loading=false;
- state.updated=new Date().toLocaleTimeString();
- if(results.length===0)state.err="No se pudo conectar a los datos de mercado. Reintenta, o súbelo a tu dominio (a veces el navegador local bloquea las llamadas).";
- else if(failed>0)state.err=failed+" monedas no cargaron, mostrando el resto.";
+ state.fng=await getFearGreed();
+ state.news=await getNews();
+ state.loading=false;state.updated=new Date().toLocaleTimeString();
+ if(results.length===0)state.err="No se pudo conectar al mercado. Reintenta.";
+ else if(failed>0)state.err=failed+" monedas no cargaron.";
  render();
 }
 
 function render(){
  const root=document.getElementById("root"),s=state;root.innerHTML="";
+ // Header with bitcoin symbol
  const head=el("div",{style:`display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid ${C.border}`});
- head.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,${C.gold},${C.purple});display:flex;align-items:center;justify-content:center;font-size:18px">📡</div><div><div style="font-size:16px;font-weight:700;color:${C.goldL};letter-spacing:.04em">SIGNAL ENGINE</div><div style="font-size:9px;color:${C.muted};letter-spacing:.15em">isditcoin.xyz · DATOS REALES</div></div></div>`;
+ head.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,${C.gold},#c9760f);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;color:#fff;box-shadow:0 0 18px ${C.gold}66">₿</div><div><div style="font-size:18px;font-weight:700;color:${C.goldL};letter-spacing:.05em">ditcoin</div><div style="font-size:9px;color:${C.muted};letter-spacing:.15em">SIGNAL ENGINE · DATOS REALES</div></div></div>`;
  const sb=el("button",{style:`padding:9px 16px;border-radius:8px;background:linear-gradient(135deg,${C.gold},#c9760f);border:none;color:#1a0e00;font-family:Rajdhani;font-size:12px;font-weight:700;cursor:pointer`});
- sb.textContent=s.loading?"ESCANEANDO…":"↻ ESCANEAR";sb.disabled=s.loading;sb.onclick=scan;head.appendChild(sb);root.appendChild(head);
+ sb.textContent=s.loading?"ESCANEANDO…":"↻ ESCANEAR";sb.disabled=s.loading;sb.onclick=scan;const links=el("div",{style:"display:flex;gap:8px;align-items:center;margin-left:auto;margin-right:12px"});
+ links.innerHTML=`<a href="https://x.com/OffcialDitcoin" target="_blank" style="text-decoration:none;display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;border:1px solid ${C.border};color:${C.text};font-size:11px;font-weight:600">𝕏 @OffcialDitcoin</a><a href="https://officialditcoin.fun" target="_blank" style="text-decoration:none;display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;border:1px solid ${C.gold}55;color:${C.goldL};font-size:11px;font-weight:600">🌐 officialditcoin.fun</a>`;
+ head.appendChild(links);
+ head.appendChild(sb);root.appendChild(head);
 
- const ctrl=el("div",{style:"display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center"});
+ const ctrl=el("div",{style:"display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center"});
  const tfw=el("div",{style:"display:flex;gap:5px"});
  [["scalp","⚡ Scalping (15m)"],["swing","📈 Swing (4h)"]].forEach(([t,l])=>{const b=el("button",{style:tabStyle(s.tf===t)});b.textContent=l;b.onclick=()=>{s.tf=t;scan();};tfw.appendChild(b);});
  ctrl.appendChild(tfw);
  const lw=el("div",{style:"display:flex;gap:6px;align-items:center;margin-left:auto"});
- lw.appendChild(el("span",{style:`font-size:11px;color:${C.muted}`},"Apalancamiento:"));
- [2,3,5,10,20].forEach(l=>{const a=s.lev===l;const b=el("button",{style:`padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:Rajdhani;cursor:pointer;background:${a?(l>=10?C.red:C.green):"transparent"};border:1px solid ${a?(l>=10?C.red:C.green):C.border};color:${a?"#000":C.muted}`});b.textContent=l+"x";b.onclick=()=>{s.lev=l;render();};lw.appendChild(b);});
+ lw.appendChild(el("span",{style:`font-size:11px;color:${C.muted}`},"Apalanc.:"));
+ [2,3,5,10,20].forEach(l=>{const a=s.lev===l;const b=el("button",{style:`padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;font-family:Rajdhani;cursor:pointer;background:${a?(l>=10?C.red:C.green):"transparent"};border:1px solid ${a?(l>=10?C.red:C.green):C.border};color:${a?"#000":C.muted}`});b.textContent=l+"x";b.onclick=()=>{s.lev=l;render();};lw.appendChild(b);});
  ctrl.appendChild(lw);root.appendChild(ctrl);
 
- if(s.lev>=10)root.appendChild(el("div",{style:`padding:9px 14px;background:#ff4d6a15;border:1px solid #ff4d6a44;border-radius:8px;font-size:11px;color:${C.red};margin-bottom:14px`},`⚠ A ${s.lev}x, un movimiento de ${(100/s.lev).toFixed(1)}% en contra = LIQUIDACIÓN total. Considera 2-3x mientras aprendes.`));
+ // Trend filter toggle
+ const fw=el("div",{style:"display:flex;gap:6px;margin-bottom:14px;align-items:center"});
+ fw.appendChild(el("span",{style:`font-size:11px;color:${C.muted}`},"Filtro:"));
+ [["both","Todas"],["trend","Solo a favor de tendencia"]].forEach(([f,l])=>{const a=s.filter===f;const b=el("button",{style:`padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;font-family:Rajdhani;cursor:pointer;background:${a?"#3a9bdc33":"transparent"};border:1px solid ${a?C.blue:C.border};color:${a?C.blue:C.muted}`});b.textContent=l;b.onclick=()=>{s.filter=f;render();};fw.appendChild(b);});
+ root.appendChild(fw);
+
+ // Market context row: Fear & Greed + News
+ const ctxRow=el("div",{style:"display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:14px"});
+ // Fear & Greed
+ const fngBox=el("div",{style:`padding:12px 14px;border-radius:10px;background:${C.panel};border:1px solid ${C.border}`});
+ if(s.fng){
+   const fc=s.fng.value<25?C.red:s.fng.value<45?C.gold:s.fng.value<55?C.yellow:s.fng.value<75?C.green:C.green;
+   fngBox.innerHTML=`<div style="font-size:9px;color:${C.muted};letter-spacing:.12em;margin-bottom:6px">FEAR & GREED</div><div style="font-size:28px;font-weight:700;color:${fc}">${s.fng.value}</div><div style="font-size:11px;color:${fc}">${s.fng.label}</div><div style="font-size:8px;color:${C.muted};margin-top:6px;line-height:1.4">Extremo miedo = posible suelo · Extremo codicia = posible techo</div>`;
+ } else fngBox.innerHTML=`<div style="font-size:9px;color:${C.muted}">FEAR & GREED</div><div style="font-size:12px;color:${C.muted};margin-top:8px">—</div>`;
+ ctxRow.appendChild(fngBox);
+ // News
+ const newsBox=el("div",{style:`padding:12px 14px;border-radius:10px;background:${C.panel};border:1px solid ${C.border};max-height:160px;overflow-y:auto`});
+ let newsHtml=`<div style="font-size:9px;color:${C.muted};letter-spacing:.12em;margin-bottom:8px">📰 NOTICIAS CRYPTO</div>`;
+ if(s.news&&s.news.length){
+   s.news.forEach(n=>{newsHtml+=`<a href="${n.link}" target="_blank" style="display:block;text-decoration:none;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid ${C.dim}"><span style="font-size:8px;color:${C.gold}">${n.src}</span><div style="font-size:11px;color:${C.text};line-height:1.4">${n.title}</div></a>`;});
+ } else newsHtml+=`<div style="font-size:10px;color:${C.muted}">Cargando noticias…</div>`;
+ newsBox.innerHTML=newsHtml;
+ ctxRow.appendChild(newsBox);
+ root.appendChild(ctxRow);
+
+
+ if(s.lev>=10)root.appendChild(el("div",{style:`padding:9px 14px;background:#ff4d6a15;border:1px solid #ff4d6a44;border-radius:8px;font-size:11px;color:${C.red};margin-bottom:14px`},`⚠ A ${s.lev}x, ${(100/s.lev).toFixed(1)}% en contra = LIQUIDACIÓN. Considera 2-3x.`));
  if(s.err)root.appendChild(el("div",{style:`padding:9px 14px;background:#ffd24d15;border:1px solid #ffd24d44;border-radius:8px;font-size:11px;color:${C.yellow};margin-bottom:14px`},s.err));
 
- if(s.loading)root.appendChild(el("div",{style:`padding:40px;text-align:center;color:${C.muted}`},"Cargando velas reales del mercado…"));
- else if(!s.signals.length&&!s.err)root.appendChild(el("div",{style:`padding:40px;text-align:center;color:${C.muted}`},"Pulsa ESCANEAR para analizar el mercado en vivo."));
- else s.signals.forEach(({coin,sig})=>{
-   const col=sig.dir==="LONG"?C.green:sig.dir==="SHORT"?C.red:C.muted;
-   const liq=sig.dir!=="NEUTRAL"?liqPrice(sig.price,sig.dir,s.lev):null;
-   const slBad=sig.sl&&liq&&(sig.dir==="LONG"?sig.sl<liq:sig.sl>liq);
-   const card=el("div",{style:`padding:14px 16px;border-radius:12px;background:linear-gradient(135deg,${C.panel},${C.bg3});border:1px solid ${sig.dir!=="NEUTRAL"?col+"55":C.border};margin-bottom:10px`});
-   const top=el("div",{style:`display:flex;justify-content:space-between;align-items:center;${sig.dir!=="NEUTRAL"?"margin-bottom:10px":""}`});
-   top.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="font-size:17px;font-weight:700;color:${C.text}">${coin.sym}<span style="font-size:11px;color:${C.muted};margin-left:6px;font-weight:400">$${fmtP(sig.price)}</span></div><div style="font-size:10px;color:${C.muted}">RSI ${sig.rsi}</div></div><div style="padding:5px 14px;border-radius:20px;background:${col}22;border:1px solid ${col}66;color:${col};font-weight:700;font-size:13px">${sig.dir}${sig.dir!=="NEUTRAL"?" · conf "+sig.conf:""}</div>`;
-   card.appendChild(top);
-   if(sig.dir!=="NEUTRAL"){
-     const grid=el("div",{style:"display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px"});
-     grid.innerHTML=box("ENTRADA","$"+fmtP(sig.price),C.text,C.bg2,C.border)+box("TAKE PROFIT","$"+fmtP(sig.tp),C.green,"#22d18211","#22d18244")+box("STOP LOSS","$"+fmtP(sig.sl),C.red,"#ff4d6a11","#ff4d6a44")+box("LIQ @ "+s.lev+"x","$"+fmtP(liq),slBad?C.red:C.yellow,C.bg2,slBad?C.red:C.border);
-     card.appendChild(grid);
-     if(slBad)card.appendChild(el("div",{style:`font-size:10px;color:${C.red};margin-bottom:6px`},"🚨 Tu Stop Loss queda más allá de la liquidación a "+s.lev+"x — baja el apalancamiento o el SL no te protege."));
-     card.appendChild(el("div",{style:`font-size:10px;color:${C.muted};line-height:1.6`},sig.reasons.map(r=>"• "+r).join("   ")));
-   } else card.appendChild(el("div",{style:`font-size:10px;color:${C.muted};margin-top:6px`},"Sin setup fuerte — "+sig.reasons.join(", ")));
-   root.appendChild(card);
- });
-
- root.appendChild(el("div",{style:`margin-top:14px;padding:10px 14px;border-radius:10px;background:#9b6dff0d;border:1px solid #9b6dff33;font-size:10px;color:${C.muted};line-height:1.6`},`Señales de indicadores reales (RSI, EMA, ATR, volumen vía Binance público) — NO son consejo financiero ni garantía. Tú decides y ejecutas cada trade manualmente. La mayoría de traders apalancados pierden. ${s.updated?"Actualizado "+s.updated:""}`));
+ if(s.loading)root.appendChild(el("div",{style:`padding:40px;text-align:center;color:${C.muted}`},"Analizando mercado + confluencia de tendencia…"));
+ else{
+   let shown=s.signals;
+   if(s.filter==="trend")shown=s.signals.filter(x=>x.sig.dir==="NEUTRAL"||x.sig.withTrend);
+   shown.forEach(({coin,sig})=>{
+     const col=sig.dir==="LONG"?C.green:sig.dir==="SHORT"?C.red:C.muted;
+     const liq=sig.dir!=="NEUTRAL"?liqPrice(sig.price,sig.dir,s.lev):null;
+     const slBad=sig.sl&&liq&&(sig.dir==="LONG"?sig.sl<liq:sig.sl>liq);
+     const card=el("div",{style:`padding:14px 16px;border-radius:12px;background:linear-gradient(135deg,${C.panel},${C.bg3});border:1px solid ${sig.dir!=="NEUTRAL"?(sig.withTrend?col+"55":C.yellow+"55"):C.border};margin-bottom:10px`});
+     const top=el("div",{style:`display:flex;justify-content:space-between;align-items:center;${sig.dir!=="NEUTRAL"?"margin-bottom:10px":""}`});
+     top.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="font-size:17px;font-weight:700;color:${C.text}">${coin.sym}<span style="font-size:11px;color:${C.muted};margin-left:6px;font-weight:400">$${fmtP(sig.price)}</span></div><div style="font-size:10px;color:${C.muted}">RSI ${sig.rsi} · HTF ${sig.htfTrend}</div></div><div style="padding:5px 14px;border-radius:20px;background:${col}22;border:1px solid ${col}66;color:${col};font-weight:700;font-size:13px">${sig.dir}${sig.dir!=="NEUTRAL"?" · "+sig.conf:""}</div>`;
+     card.appendChild(top);
+     if(sig.dir!=="NEUTRAL"){
+       if(sig.trendNote)card.appendChild(el("div",{style:`font-size:10px;margin-bottom:8px;color:${sig.withTrend?C.green:C.yellow}`},sig.trendNote));
+       const grid=el("div",{style:"display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:8px"});
+       grid.innerHTML=box("ENTRADA","$"+fmtP(sig.price),C.text,C.bg2,C.border)+box("TP","$"+fmtP(sig.tp),C.green,"#22d18211","#22d18244")+box("SL","$"+fmtP(sig.sl),C.red,"#ff4d6a11","#ff4d6a44")+box("R:R","1:"+sig.rr,C.blue,C.bg2,C.border)+box("LIQ "+s.lev+"x","$"+fmtP(liq),slBad?C.red:C.yellow,C.bg2,slBad?C.red:C.border);
+       card.appendChild(grid);
+       if(slBad)card.appendChild(el("div",{style:`font-size:10px;color:${C.red};margin-bottom:6px`},"🚨 SL más allá de liquidación a "+s.lev+"x — baja apalancamiento."));
+       card.appendChild(el("div",{style:`font-size:10px;color:${C.muted};line-height:1.6`},sig.reasons.map(r=>"• "+r).join("   ")));
+     } else card.appendChild(el("div",{style:`font-size:10px;color:${C.muted};margin-top:6px`},"Sin setup claro — "+sig.reasons.slice(0,3).join(", ")));
+     root.appendChild(card);
+   });
+   if(s.signals.length&&!shown.length)root.appendChild(el("div",{style:`padding:30px;text-align:center;color:${C.muted}`},"Ninguna señal a favor de tendencia ahora. Cambia el filtro a 'Todas' o espera."));
+ }
+ root.appendChild(el("div",{style:`margin-top:14px;padding:10px 14px;border-radius:10px;background:#9b6dff0d;border:1px solid #9b6dff33;font-size:10px;color:${C.muted};line-height:1.6`},`Estrategia: RSI + EMA9/21 + MACD + tendencia EMA50 + confluencia 4h + volumen + contexto (Fear&Greed, noticias). Señales NO son consejo financiero. Tú decides y ejecutas manualmente. La mayoría de traders apalancados pierden. ${s.updated?"Actualizado "+s.updated:""}`));
 }
 function tabStyle(a){return `padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;font-family:Rajdhani;cursor:pointer;background:${a?"linear-gradient(135deg,#3a9bdc44,#9b6dff22)":"transparent"};border:1px solid ${a?"#3a9bdc99":C.border};color:${a?C.blue:C.muted}`;}
-function box(l,v,c,bg,bd){return `<div style="padding:7px 10px;border-radius:7px;background:${bg};border:1px solid ${bd}"><div style="font-size:8px;color:${C.muted}">${l}</div><div style="font-size:13px;font-weight:700;color:${c}">${v}</div></div>`;}
+function box(l,v,c,bg,bd){return `<div style="padding:6px 8px;border-radius:7px;background:${bg};border:1px solid ${bd}"><div style="font-size:7px;color:${C.muted}">${l}</div><div style="font-size:12px;font-weight:700;color:${c}">${v}</div></div>`;}
 function el(t,a,x){const e=document.createElement(t);if(a&&a.style)e.setAttribute("style",a.style);if(x!=null)e.textContent=x;return e;}
 render();scan();
 </script>
