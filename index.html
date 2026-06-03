@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>isditcoin.xyz — Signal Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:radial-gradient(ellipse at top,#0d1826,#060b13);font-family:'Rajdhani',sans-serif;color:#e6edf7;min-height:100vh}
+button:hover:not(:disabled){filter:brightness(1.12)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#1d3650;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root" style="max-width:880px;margin:0 auto;padding:18px"></div>
+<script>
+const C={bg:"#060b13",bg2:"#0d1826",bg3:"#13283f",panel:"#0f1f33",border:"#1d3650",
+green:"#22d182",red:"#ff4d6a",gold:"#f7931a",goldL:"#ffb74d",blue:"#3a9bdc",
+purple:"#9b6dff",text:"#e6edf7",muted:"#6a83a3",dim:"#162840",yellow:"#ffd24d"};
+
+// Binance public API works from browser (no CORS block, no key needed)
+const COINS=[
+ {sym:"BTC", pair:"BTCUSDT", name:"Bitcoin"},
+ {sym:"ETH", pair:"ETHUSDT", name:"Ethereum"},
+ {sym:"SOL", pair:"SOLUSDT", name:"Solana"},
+ {sym:"BNB", pair:"BNBUSDT", name:"BNB"},
+ {sym:"XRP", pair:"XRPUSDT", name:"XRP"},
+ {sym:"AVAX",pair:"AVAXUSDT",name:"Avalanche"},
+];
+
+// Multiple Binance endpoints + proxy fallback
+const BASES=["https://api.binance.com","https://api1.binance.com","https://data-api.binance.vision"];
+async function getKlines(pair,interval,limit){
+ for(const base of BASES){
+   try{
+     const url=`${base}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
+     const r=await fetch(url,{signal:AbortSignal.timeout(7000)});
+     if(r.ok){
+       const d=await r.json();
+       return d.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));
+     }
+   }catch(e){}
+ }
+ // proxy fallback
+ try{
+   const url=`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`;
+   const r=await fetch("https://corsproxy.io/?"+encodeURIComponent(url),{signal:AbortSignal.timeout(8000)});
+   if(r.ok){const d=await r.json();return d.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));}
+ }catch(e){}
+ return null;
+}
+
+function ema(values,period){const k=2/(period+1);let e=values[0];const out=[e];for(let i=1;i<values.length;i++){e=values[i]*k+e*(1-k);out.push(e);}return out;}
+function rsi(closes,period=14){if(closes.length<period+1)return 50;let g=0,l=0;for(let i=closes.length-period;i<closes.length;i++){const d=closes[i]-closes[i-1];if(d>=0)g+=d;else l-=d;}const aG=g/period,aL=l/period;if(aL===0)return 100;return Math.round(100-100/(1+aG/aL));}
+function atr(c,period=14){if(c.length<period+1)return c[c.length-1].close*0.02;let s=0;for(let i=c.length-period;i<c.length;i++){s+=Math.max(c[i].high-c[i].low,Math.abs(c[i].high-c[i-1].close),Math.abs(c[i].low-c[i-1].close));}return s/period;}
+
+function analyze(candles,tf){
+ const closes=candles.map(c=>c.close);
+ const price=closes[closes.length-1];
+ const r=rsi(closes,14);
+ const eF=ema(closes,9),eS=ema(closes,21);
+ const ef=eF[eF.length-1],es=eS[eS.length-1],efP=eF[eF.length-2],esP=eS[eS.length-2];
+ const a=atr(candles,14);
+ const vols=candles.map(c=>c.vol);
+ const rv=vols[vols.length-1],av=vols.slice(-21,-1).reduce((s,v)=>s+v,0)/20;
+ const volSpike=rv>av*1.4;
+ // trend strength via EMA distance
+ const trendPct=((ef-es)/es*100);
+
+ let score=0;const reasons=[];
+ if(r<30){score+=2;reasons.push("RSI "+r+" sobrevendido");}
+ else if(r>70){score-=2;reasons.push("RSI "+r+" sobrecomprado");}
+ else reasons.push("RSI "+r);
+ const crossUp=efP<=esP&&ef>es, crossDown=efP>=esP&&ef<es;
+ if(crossUp){score+=2;reasons.push("EMA9 cruzó sobre EMA21 (alcista)");}
+ else if(crossDown){score-=2;reasons.push("EMA9 cruzó bajo EMA21 (bajista)");}
+ else if(ef>es){score+=1;reasons.push("Tendencia alcista ("+trendPct.toFixed(1)+"%)");}
+ else{score-=1;reasons.push("Tendencia bajista ("+trendPct.toFixed(1)+"%)");}
+ if(volSpike){score+=(score>=0?1:-1);reasons.push("Volumen alto confirma");}
+
+ let dir="NEUTRAL";
+ if(score>=3)dir="LONG";else if(score<=-3)dir="SHORT";
+ const mult=tf==="scalp"?1.0:2.0;
+ let tp=null,sl=null;
+ if(dir==="LONG"){sl=price-a*1.0*mult;tp=price+a*2.0*mult;}
+ if(dir==="SHORT"){sl=price+a*1.0*mult;tp=price-a*2.0*mult;}
+ // confidence label
+ const absScore=Math.abs(score);
+ const conf=absScore>=4?"Alta":absScore>=3?"Media":"Baja";
+ return {dir,score,reasons,price,tp,sl,rsi:r,conf};
+}
+function liqPrice(e,dir,lev){const m=e*(1/lev)*0.95;return dir==="LONG"?e-m:e+m;}
+const fmtP=p=>p==null?"—":p>=1000?p.toLocaleString(undefined,{maximumFractionDigits:0}):p>=1?p.toFixed(2):p.toFixed(4);
+
+let state={tf:"scalp",lev:3,signals:[],loading:false,updated:null,err:null};
+
+async function scan(){
+ state.loading=true;state.err=null;render();
+ const interval=state.tf==="scalp"?"15m":"4h";
+ const results=[];let failed=0;
+ for(const coin of COINS){
+   const candles=await getKlines(coin.pair,interval,50);
+   if(!candles){failed++;continue;}
+   results.push({coin,sig:analyze(candles,state.tf)});
+ }
+ state.signals=results;
+ state.loading=false;
+ state.updated=new Date().toLocaleTimeString();
+ if(results.length===0)state.err="No se pudo conectar a los datos de mercado. Reintenta, o súbelo a tu dominio (a veces el navegador local bloquea las llamadas).";
+ else if(failed>0)state.err=failed+" monedas no cargaron, mostrando el resto.";
+ render();
+}
+
+function render(){
+ const root=document.getElementById("root"),s=state;root.innerHTML="";
+ const head=el("div",{style:`display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid ${C.border}`});
+ head.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,${C.gold},${C.purple});display:flex;align-items:center;justify-content:center;font-size:18px">📡</div><div><div style="font-size:16px;font-weight:700;color:${C.goldL};letter-spacing:.04em">SIGNAL ENGINE</div><div style="font-size:9px;color:${C.muted};letter-spacing:.15em">isditcoin.xyz · DATOS REALES</div></div></div>`;
+ const sb=el("button",{style:`padding:9px 16px;border-radius:8px;background:linear-gradient(135deg,${C.gold},#c9760f);border:none;color:#1a0e00;font-family:Rajdhani;font-size:12px;font-weight:700;cursor:pointer`});
+ sb.textContent=s.loading?"ESCANEANDO…":"↻ ESCANEAR";sb.disabled=s.loading;sb.onclick=scan;head.appendChild(sb);root.appendChild(head);
+
+ const ctrl=el("div",{style:"display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center"});
+ const tfw=el("div",{style:"display:flex;gap:5px"});
+ [["scalp","⚡ Scalping (15m)"],["swing","📈 Swing (4h)"]].forEach(([t,l])=>{const b=el("button",{style:tabStyle(s.tf===t)});b.textContent=l;b.onclick=()=>{s.tf=t;scan();};tfw.appendChild(b);});
+ ctrl.appendChild(tfw);
+ const lw=el("div",{style:"display:flex;gap:6px;align-items:center;margin-left:auto"});
+ lw.appendChild(el("span",{style:`font-size:11px;color:${C.muted}`},"Apalancamiento:"));
+ [2,3,5,10,20].forEach(l=>{const a=s.lev===l;const b=el("button",{style:`padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:Rajdhani;cursor:pointer;background:${a?(l>=10?C.red:C.green):"transparent"};border:1px solid ${a?(l>=10?C.red:C.green):C.border};color:${a?"#000":C.muted}`});b.textContent=l+"x";b.onclick=()=>{s.lev=l;render();};lw.appendChild(b);});
+ ctrl.appendChild(lw);root.appendChild(ctrl);
+
+ if(s.lev>=10)root.appendChild(el("div",{style:`padding:9px 14px;background:#ff4d6a15;border:1px solid #ff4d6a44;border-radius:8px;font-size:11px;color:${C.red};margin-bottom:14px`},`⚠ A ${s.lev}x, un movimiento de ${(100/s.lev).toFixed(1)}% en contra = LIQUIDACIÓN total. Considera 2-3x mientras aprendes.`));
+ if(s.err)root.appendChild(el("div",{style:`padding:9px 14px;background:#ffd24d15;border:1px solid #ffd24d44;border-radius:8px;font-size:11px;color:${C.yellow};margin-bottom:14px`},s.err));
+
+ if(s.loading)root.appendChild(el("div",{style:`padding:40px;text-align:center;color:${C.muted}`},"Cargando velas reales del mercado…"));
+ else if(!s.signals.length&&!s.err)root.appendChild(el("div",{style:`padding:40px;text-align:center;color:${C.muted}`},"Pulsa ESCANEAR para analizar el mercado en vivo."));
+ else s.signals.forEach(({coin,sig})=>{
+   const col=sig.dir==="LONG"?C.green:sig.dir==="SHORT"?C.red:C.muted;
+   const liq=sig.dir!=="NEUTRAL"?liqPrice(sig.price,sig.dir,s.lev):null;
+   const slBad=sig.sl&&liq&&(sig.dir==="LONG"?sig.sl<liq:sig.sl>liq);
+   const card=el("div",{style:`padding:14px 16px;border-radius:12px;background:linear-gradient(135deg,${C.panel},${C.bg3});border:1px solid ${sig.dir!=="NEUTRAL"?col+"55":C.border};margin-bottom:10px`});
+   const top=el("div",{style:`display:flex;justify-content:space-between;align-items:center;${sig.dir!=="NEUTRAL"?"margin-bottom:10px":""}`});
+   top.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><div style="font-size:17px;font-weight:700;color:${C.text}">${coin.sym}<span style="font-size:11px;color:${C.muted};margin-left:6px;font-weight:400">$${fmtP(sig.price)}</span></div><div style="font-size:10px;color:${C.muted}">RSI ${sig.rsi}</div></div><div style="padding:5px 14px;border-radius:20px;background:${col}22;border:1px solid ${col}66;color:${col};font-weight:700;font-size:13px">${sig.dir}${sig.dir!=="NEUTRAL"?" · conf "+sig.conf:""}</div>`;
+   card.appendChild(top);
+   if(sig.dir!=="NEUTRAL"){
+     const grid=el("div",{style:"display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px"});
+     grid.innerHTML=box("ENTRADA","$"+fmtP(sig.price),C.text,C.bg2,C.border)+box("TAKE PROFIT","$"+fmtP(sig.tp),C.green,"#22d18211","#22d18244")+box("STOP LOSS","$"+fmtP(sig.sl),C.red,"#ff4d6a11","#ff4d6a44")+box("LIQ @ "+s.lev+"x","$"+fmtP(liq),slBad?C.red:C.yellow,C.bg2,slBad?C.red:C.border);
+     card.appendChild(grid);
+     if(slBad)card.appendChild(el("div",{style:`font-size:10px;color:${C.red};margin-bottom:6px`},"🚨 Tu Stop Loss queda más allá de la liquidación a "+s.lev+"x — baja el apalancamiento o el SL no te protege."));
+     card.appendChild(el("div",{style:`font-size:10px;color:${C.muted};line-height:1.6`},sig.reasons.map(r=>"• "+r).join("   ")));
+   } else card.appendChild(el("div",{style:`font-size:10px;color:${C.muted};margin-top:6px`},"Sin setup fuerte — "+sig.reasons.join(", ")));
+   root.appendChild(card);
+ });
+
+ root.appendChild(el("div",{style:`margin-top:14px;padding:10px 14px;border-radius:10px;background:#9b6dff0d;border:1px solid #9b6dff33;font-size:10px;color:${C.muted};line-height:1.6`},`Señales de indicadores reales (RSI, EMA, ATR, volumen vía Binance público) — NO son consejo financiero ni garantía. Tú decides y ejecutas cada trade manualmente. La mayoría de traders apalancados pierden. ${s.updated?"Actualizado "+s.updated:""}`));
+}
+function tabStyle(a){return `padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;font-family:Rajdhani;cursor:pointer;background:${a?"linear-gradient(135deg,#3a9bdc44,#9b6dff22)":"transparent"};border:1px solid ${a?"#3a9bdc99":C.border};color:${a?C.blue:C.muted}`;}
+function box(l,v,c,bg,bd){return `<div style="padding:7px 10px;border-radius:7px;background:${bg};border:1px solid ${bd}"><div style="font-size:8px;color:${C.muted}">${l}</div><div style="font-size:13px;font-weight:700;color:${c}">${v}</div></div>`;}
+function el(t,a,x){const e=document.createElement(t);if(a&&a.style)e.setAttribute("style",a.style);if(x!=null)e.textContent=x;return e;}
+render();scan();
+</script>
+</body>
+</html>
