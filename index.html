@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>DITCOIN REALM · City Wars — isditcoin.xyz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0f14;--panel:#141a23;--panel2:#1b232f;--line:#2a3543;--ink:#e7eef6;
+    --muted:#8aa0b6;--gold:#ffcb45;--gold-d:#c8942a;--hp:#ff5b5b;--xp:#5bd0ff;
+    --good:#5be07a;--accent:#4ea1ff;--enemy:#ff5b5b;--mine:#4ea1ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:'VT323',ui-monospace,monospace;overflow:hidden;}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;}
+  #topbar{display:flex;align-items:center;gap:12px;padding:8px 12px;
+    background:linear-gradient(180deg,#10151d,#0c0f14);border-bottom:1px solid var(--line);z-index:30;}
+  .brand{font-family:'Press Start 2P';font-size:12px;letter-spacing:1px;color:var(--gold);
+    text-shadow:0 2px 0 #00000080;white-space:nowrap;}
+  .brand small{color:var(--muted);font-family:'VT323';font-size:16px;margin-left:6px;letter-spacing:0;}
+  .spacer{flex:1;}
+  .gate{display:flex;align-items:center;gap:8px;font-size:18px;color:var(--muted);}
+  .dot{width:8px;height:8px;border-radius:50%;background:#ff5b5b;box-shadow:0 0 8px #ff5b5b;}
+  .dot.ok{background:var(--good);box-shadow:0 0 8px var(--good);}
+  button.wallet{font-family:'Press Start 2P';font-size:9px;cursor:pointer;
+    background:linear-gradient(180deg,var(--gold),var(--gold-d));color:#1a1206;
+    border:none;border-radius:6px;padding:9px 12px;box-shadow:0 3px 0 #7a5a17;}
+  button.wallet:active{transform:translateY(2px);box-shadow:0 1px 0 #7a5a17;}
+  button.wallet.connected{background:linear-gradient(180deg,#243140,#1a2430);color:var(--good);box-shadow:0 3px 0 #0c1118;}
+
+  #stage{position:relative;flex:1;overflow:hidden;
+    background:radial-gradient(120% 80% at 50% -10%, #1a2740 0%, #0c0f14 60%);}
+  canvas{display:block;width:100%;height:100%;cursor:crosshair;}
+
+  .hud{position:absolute;pointer-events:none;z-index:20;}
+  #stats{left:12px;top:12px;width:240px;background:rgba(16,21,29,.85);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;backdrop-filter:blur(4px);}
+  .row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:18px;}
+  .row .lab{font-family:'Press Start 2P';font-size:7px;color:var(--muted);min-width:38px;white-space:nowrap;}
+  .bar{flex:1;height:12px;background:#0a0e13;border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+  .bar > i{display:block;height:100%;width:50%;transition:width .15s;}
+  .bar.hp > i{background:linear-gradient(90deg,#ff7676,#ff3b3b);}
+  .bar.xp > i{background:linear-gradient(90deg,#8fe3ff,#37b6ff);}
+  .val{font-size:18px;color:var(--ink);min-width:54px;text-align:right;}
+  .gold .val{color:var(--gold);}
+  .lvlpill{font-family:'Press Start 2P';font-size:9px;color:#1a1206;background:var(--gold);border-radius:4px;padding:3px 6px;}
+  .empire{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:17px;color:var(--muted);}
+  .empire b{color:var(--gold);} .empire .inc{color:var(--good);}
+  .chips{display:flex;gap:6px;margin:6px 0 2px;flex-wrap:wrap;}
+  .chip{display:flex;align-items:center;gap:4px;font-size:16px;background:#0a0e13;border:1px solid var(--line);
+    border-radius:7px;padding:3px 7px;} .chip small{color:var(--muted);font-size:12px;}
+  .chip.cp b{color:#ffd27a;} .chip.dit b{color:#7fdfff;} .chip.sol b{color:#c9a6ff;}
+  .adminb{display:none;font-family:'Press Start 2P';font-size:7px;color:#1a1206;background:linear-gradient(180deg,#ffd24a,#c8942a);
+    border-radius:4px;padding:3px 5px;margin-left:auto;box-shadow:0 0 10px #ffd24a88;}
+  .sellrow.legend{border-color:#7a5cff;background:linear-gradient(100deg,#1b2233,#241a3a);
+    box-shadow:0 0 0 1px #7a5cff55, 0 0 16px #7a5cff33;animation:lgpulse 2.2s ease-in-out infinite;}
+  @keyframes lgpulse{0%,100%{box-shadow:0 0 0 1px #7a5cff55,0 0 12px #7a5cff22}50%{box-shadow:0 0 0 1px #b69cff,0 0 22px #b69cff66}}
+  .lgtag{font-family:'Press Start 2P';font-size:7px;color:#1a1206;background:linear-gradient(90deg,#ffd24a,#b69cff);
+    border-radius:4px;padding:2px 5px;margin:0 4px;}
+  .gate-ov{background:radial-gradient(120% 90% at 50% 0%, #1a1230 0%, #06070b 70%);}
+
+  #inv{right:12px;top:12px;width:170px;background:rgba(16,21,29,.85);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;backdrop-filter:blur(4px);}
+  #inv h4{margin:0 0 8px;font-family:'Press Start 2P';font-size:8px;color:var(--muted);letter-spacing:1px;}
+  .item{display:flex;align-items:center;gap:8px;font-size:20px;margin:6px 0;}
+  .ic{width:22px;height:22px;border-radius:5px;display:grid;place-items:center;font-size:15px;border:1px solid var(--line);}
+  .ic.wood{background:#3b2a18;} .ic.stone{background:#2c333b;} .ic.fish{background:#173040;}
+  .item .n{margin-left:auto;color:var(--ink);}
+
+  #warn{right:12px;bottom:14px;width:190px;background:rgba(40,12,14,.88);border:1px solid #6a2a2a;
+    border-radius:10px;padding:8px 12px;font-size:17px;color:#ffb3b3;display:none;}
+  #warn.show{display:block;animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 #ff5b5b00}50%{box-shadow:0 0 14px #ff5b5b66}}
+  #goals{left:12px;bottom:14px;width:230px;background:rgba(16,21,29,.85);border:1px solid var(--line);
+    border-radius:10px;padding:8px 12px;backdrop-filter:blur(4px);}
+  #goals h4{margin:0 0 6px;font-family:'Press Start 2P';font-size:8px;color:var(--gold);letter-spacing:1px;}
+  .goal{font-size:16px;color:var(--ink);margin:5px 0;}
+  .goal .gb{height:6px;background:#0a0e13;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-top:2px;}
+  .goal .gb>i{display:block;height:100%;background:linear-gradient(90deg,#8fe3ff,#37b6ff);}
+  .goal.done{color:var(--good);} .goal.done .gb>i{background:var(--good);}
+  .goal .rw{color:var(--gold);font-size:14px;}
+  #control{left:50%;top:58px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto;}
+  .cbtn{font-family:'Press Start 2P';font-size:8px;cursor:pointer;border:1px solid var(--line);border-radius:7px;
+    padding:8px 10px;background:rgba(20,26,35,.92);color:var(--muted);}
+  .cbtn.on{background:linear-gradient(180deg,#5fb0ff,#2f78c8);color:#06121f;border-color:#2f78c8;}
+
+  #hint{left:50%;bottom:14px;transform:translateX(-50%);text-align:center;font-size:18px;color:var(--muted);
+    background:rgba(12,15,20,.7);padding:6px 14px;border-radius:20px;border:1px solid var(--line);max-width:90%;}
+  #toasts{left:50%;top:64px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;}
+  .toast{font-size:18px;background:rgba(20,26,35,.95);border:1px solid var(--line);border-radius:8px;padding:6px 12px;
+    animation:pop .3s ease, fade .4s ease 1.9s forwards;}
+  .toast.gold{color:var(--gold);border-color:#5a4516;} .toast.good{color:var(--good);} .toast.bad{color:var(--hp);}
+  @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+  @keyframes fade{to{opacity:0;transform:translateY(-8px)}}
+
+  .ov{position:absolute;inset:0;z-index:40;display:none;place-items:center;background:rgba(6,9,13,.7);backdrop-filter:blur(3px);}
+  .ov.open{display:grid;}
+  .modal{width:min(440px,93vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px;box-shadow:0 20px 60px #000a;}
+  .modal h3{font-family:'Press Start 2P';font-size:12px;color:var(--gold);margin:0 0 6px;}
+  .modal p{color:var(--muted);font-size:18px;margin:0 0 12px;}
+  .sellrow,.warrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);
+    border-radius:9px;margin:8px 0;background:var(--panel2);font-size:19px;}
+  .sellrow .price{margin-left:auto;color:var(--gold);font-size:17px;}
+  .btn{font-family:'Press Start 2P';font-size:8px;cursor:pointer;border:none;border-radius:6px;padding:9px 11px;
+    background:linear-gradient(180deg,var(--gold),var(--gold-d));color:#1a1206;box-shadow:0 3px 0 #7a5a17;}
+  .btn:disabled{filter:grayscale(1) brightness(.6);cursor:not-allowed;box-shadow:none;}
+  .btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #7a5a17;}
+  .btn.blue{background:linear-gradient(180deg,#5fb0ff,#2f78c8);box-shadow:0 3px 0 #1c4a82;color:#06121f;}
+  .warrow .ml{margin-left:auto;display:flex;gap:6px;}
+  .closebtn{display:block;margin:14px auto 0;font-family:'Press Start 2P';font-size:9px;background:#243140;color:var(--ink);
+    border:1px solid var(--line);border-radius:7px;padding:9px 16px;cursor:pointer;}
+  .controls{font-size:16px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5;}
+  .cost{font-size:15px;color:var(--muted);}
+  .townhp{height:8px;border-radius:4px;background:#0a0e13;border:1px solid var(--line);overflow:hidden;margin:6px 0;}
+  .townhp > i{display:block;height:100%;background:linear-gradient(90deg,#ff7676,#ff3b3b);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="brand">DITCOIN&nbsp;REALM <small>· City Wars · isditcoin.xyz</small></div>
+    <div class="spacer"></div>
+    <button id="muteBtn" class="wallet" style="background:#1b232f;box-shadow:0 3px 0 #0c1118;color:#fff;padding:9px 11px;">🔊</button>
+    <button id="shareBtn" class="wallet" style="background:linear-gradient(180deg,#222,#000);box-shadow:0 3px 0 #000;color:#fff;">𝕏 Share +5 💎</button>
+    <button id="shopBtn" class="wallet" style="background:linear-gradient(180deg,#b06bff,#6a2fb8);box-shadow:0 3px 0 #3d1a6e;color:#fff;">🛍 SHOP</button>
+    <div class="gate"><span id="gateDot" class="dot"></span><span id="gateText">Wallet not connected</span></div>
+    <button id="walletBtn" class="wallet">Connect wallet</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <div class="hud" id="stats">
+      <div class="row"><span class="lvlpill" id="lvl">Lv 1</span><div class="bar xp"><i id="xpFill"></i></div><span id="adminBadge" class="adminb">ADMIN</span></div>
+      <div class="row"><span class="lab">HP</span><div class="bar hp"><i id="hpFill"></i></div><span class="val" id="hpVal">100/100</span></div>
+      <div class="chips">
+        <span class="chip cp">🪙 <b id="cpVal">0</b><small>CP</small></span>
+        <span class="chip dit">💎 <b id="ditVal">0</b><small>$DITCOIN</small></span>
+        <span class="chip sol">◎ <b id="solVal">0</b><small>SOL</small></span>
+      </div>
+      <div class="empire">Towns: <b id="townCount">0</b> · Income <span class="inc" id="incRate">0/min</span> · Soldiers <b id="armyCount">0</b></div>
+    </div>
+
+    <div class="hud" id="inv">
+      <h4>INVENTORY</h4>
+      <div class="item"><span class="ic wood">🪵</span> Wood <span class="n" id="wood">0</span></div>
+      <div class="item"><span class="ic stone">🪨</span> Stone <span class="n" id="stone">0</span></div>
+      <div class="item"><span class="ic fish">🐟</span> Fish <span class="n" id="fish">0</span></div>
+    </div>
+
+    <div class="hud" id="warn">⚔ Incoming attack on <b id="warnTown">—</b>!</div>
+    <div class="hud" id="goals"><h4>DAILY GOALS</h4><div id="goalList"></div></div>
+    <div class="hud" id="control"></div>
+    <div class="hud" id="toasts"></div>
+    <div class="hud" id="hint">Explore the fog · click ground to move (buy boots for speed) · your town → Send scout to reveal the map · flag ⚐ = claim · slime = combat</div>
+  </div>
+
+  <!-- MERCADO -->
+  <div id="market" class="ov">
+    <div class="modal">
+      <h3>🏪 MARKET</h3>
+      <p>Sell resources for Crypto Points (CP) — the free in-game currency you spend on towns & soldiers.</p>
+      <div class="sellrow"><span class="ic wood">🪵</span> Wood <span id="mWood">0</span><span class="price">3 CP</span><button class="btn" data-sell="wood">Sell</button></div>
+      <div class="sellrow"><span class="ic stone">🪨</span> Stone <span id="mStone">0</span><span class="price">5 CP</span><button class="btn" data-sell="stone">Sell</button></div>
+      <div class="sellrow"><span class="ic fish">🐟</span> Fish <span id="mFish">0</span><span class="price">8 CP</span><button class="btn" data-sell="fish">Sell</button></div>
+      <button class="closebtn" id="closeMarket">CLOSE</button>
+    </div>
+  </div>
+
+  <!-- CUARTEL / SALA DE GUERRA -->
+  <div id="war" class="ov">
+    <div class="modal" id="warModal"></div>
+  </div>
+
+  <!-- SHOP -->
+  <div id="shop" class="ov">
+    <div class="modal" id="shopModal"></div>
+  </div>
+
+  <!-- CONNECT-TO-PLAY GATE -->
+  <div id="gateOverlay" class="ov gate-ov open">
+    <div class="modal" style="text-align:center">
+      <div style="font-size:54px;line-height:1">🟣</div>
+      <h3 style="margin:6px 0">DITCOIN REALM</h3>
+      <p>Connect your Phantom wallet to enter the realm. Earn <b>$DITCOIN</b> rewards, spend <b>Crypto Points</b> in-game, and buy gear with <b>SOL</b>.</p>
+      <button class="btn" id="gateConnect" style="font-size:10px;padding:12px 18px">👻 Connect Phantom</button>
+      <div style="margin-top:10px"><button class="cbtn" id="gateAdmin">Enter as Admin (dev)</button></div>
+      <div class="controls">Non-custodial: you sign every transaction. Only approve what you trust.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ===========================================================================
+   DITCOIN REALM v2 — cliente isométrico + GUERRA DE CIUDADES (single-player)
+   Loop económico: pueblos = RENTA pasiva (fuente) · cuartel/soldados = COSTE (sumidero)
+   defender oleadas = recompensa $DITCOIN · perder un pueblo = pierdes su renta.
+   Base para luego: servidor autoritativo + PvP real + $DITCOIN on-chain no-custodial.
+   =========================================================================== */
+const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+let DPR=Math.min(window.devicePixelRatio||1,2), VW=0,VH=0;
+const TW=64,TH=32,MAP=26; let zoom=1;
+const SPAWN={x:13,y:13};
+
+// ---- map ----
+const tiles=[];
+(function(){ for(let y=0;y<MAP;y++){tiles[y]=[];for(let x=0;x<MAP;x++)tiles[y][x]=0;}
+  for(let y=16;y<MAP;y++)for(let x=1;x<11;x++){ if((x-5)**2+(y-21)**2<20) tiles[y][x]=1; } // lake (SW)
+  for(let y=8;y<=12;y++)for(let x=10;x<=15;x++) tiles[y][x]=2;                              // market plaza
+})();
+const inB=(x,y)=>x>=0&&y>=0&&x<MAP&&y<MAP;
+
+// ---- fog of war (Age-of-Empires style) ----
+const explored=[], visible=[];
+for(let y=0;y<MAP;y++){explored[y]=[];visible[y]=[];for(let x=0;x<MAP;x++){explored[y][x]=false;visible[y][x]=false;}}
+
+// ---- world entities ----
+const resources=[], mobs=[], floats=[], armies=[], scouts=[], workers=[];
+const MARKET={x:13,y:10};
+const BTC={x:13,y:12};   // bitcoin emblem on the plaza floor
+const towns=[
+  {name:'Greenhollow',x:17,y:16, owner:'player',  hp:140,maxHp:140, barracks:true,  soldiers:2, q:0, qt:0, wall:1, home:true},
+  {name:'Highspire',  x:4, y:5,  owner:'neutral', hp:120,maxHp:120, barracks:false, soldiers:0, q:0, qt:0, wall:0},
+  {name:'Riverwatch', x:9, y:18, owner:'neutral', hp:120,maxHp:120, barracks:false, soldiers:0, q:0, qt:0, wall:0},
+  {name:'Bastion',    x:21,y:21, owner:'enemy',   hp:160,maxHp:160, barracks:true,  soldiers:6, q:0, qt:0, wall:2},
+];
+const TERR_R=4;                              // territory control radius
+function workerCap(){return 2+player.level;} // level up to field more workers
+
+// costs / economy
+const PRICES={wood:3,stone:5,fish:8};
+const CLAIM_COST=g=>g===0?0:80;               // primer pueblo gratis
+const BARRACKS_COST={wood:25,stone:18,dit:40};
+const SOLDIER_COST={dit:12}, SOLDIER_TIME=6;  // s por soldado
+const INCOME_BASE=0.4, INCOME_BARRACKS=0.6;   // $DITCOIN/s por pueblo
+
+// ---- SHOP catalog: bought with SOL (Phantom). Legendary items glow. ----
+const WEAPONS={
+  fists:  {name:'Bare Claws',    dmg:0,  sol:0,    emoji:'✊', legendary:false},
+  dagger: {name:'Shadow Dagger', dmg:7,  sol:0.05, emoji:'🗡️', legendary:false},
+  axe:    {name:'War Axe',       dmg:14, sol:0.12, emoji:'🪓', legendary:false},
+  blade:  {name:'Neon Blade',    dmg:24, sol:0.25, emoji:'⚔️', legendary:true},
+  staff:  {name:'Hex Staff',     dmg:36, sol:0.5,  emoji:'🪄', legendary:true},
+};
+const OUTFITS={
+  classic:{name:'Classic Hoodie', color:'#0e0f14', sol:0,    legendary:false},
+  crimson:{name:'Crimson Drip',   color:'#3a0e16', sol:0.06, legendary:false},
+  ice:    {name:'Glacier Hoodie', color:'#0e2433', sol:0.1,  legendary:false},
+  toxic:  {name:'Toxic Hoodie',   color:'#10331a', sol:0.15, legendary:false},
+  gold:   {name:'Golden Drip',    color:'#3a2c08', sol:0.3,  legendary:true},
+};
+// boots = move speed
+const BASE_SPD=95;
+const BOOTS={
+  none:   {name:'Bare Feet',     mult:1.0, sol:0,    emoji:'🦶', legendary:false},
+  sandals:{name:'Swift Sandals', mult:1.4, sol:0.05, emoji:'🥿', legendary:false},
+  boots:  {name:'Trail Boots',   mult:1.8, sol:0.14, emoji:'🥾', legendary:false},
+  blink:  {name:'Blink Striders',mult:2.3, sol:0.35, emoji:'👟', legendary:true},
+};
+
+function tileBlockedForPath(x,y){
+  if(!inB(x,y))return true;
+  if(tiles[y][x]===1)return true;
+  if(x===MARKET.x&&y===MARKET.y)return true;
+  for(const t of towns) if(t.x===x&&t.y===y) return true;
+  for(const r of resources) if(!r.dead&&r.x===x&&r.y===y) return true;
+  return false;
+}
+
+// ---- player ----
+const player={x:SPAWN.x,y:SPAWN.y,px:0,py:0,path:[],moving:false,hp:100,maxHp:100,gold:0,dit:0,sol:0,xp:0,level:1,xpNext:90,
+  inv:{wood:0,stone:0,fish:0},target:null,actCd:0,hurtCd:0,incAcc:0,combo:0,comboT:0,
+  weapon:'fists',outfit:'classic',boots:'none',owned:{weapons:['fists'],outfits:['classic'],boots:['none']}};
+player.px=isoX(SPAWN.x,SPAWN.y);player.py=isoY(SPAWN.x,SPAWN.y);
+
+// ---- wallet + effects state ----
+const wallet={connected:false,pubkey:'',admin:false};
+const ADMIN_WALLETS=['REPLACE_WITH_YOUR_PHANTOM_ADDRESS']; // your wallet(s) get admin perks
+const SOL_CONFIG={live:false, recipient:'', rpc:'https://api.mainnet-beta.solana.com', ditcoinMint:''}; // live=false => safe demo, no real transfer
+const particles=[]; let flash=0;
+
+function isoX(gx,gy){return (gx-gy)*(TW/2);}
+function isoY(gx,gy){return (gx+gy)*(TH/2);}
+let control=null;                 // active unit: the hero or a selected scout
+function camera(){const u=control||player;return {x:VW/2-u.px*zoom, y:VH/2-u.py*zoom-10};}
+function screenToTile(mx,my){const c=camera();const wx=(mx-c.x)/zoom,wy=(my-c.y)/zoom;
+  return {x:Math.round((wx/(TW/2)+wy/(TH/2))/2), y:Math.round((wy/(TH/2)-wx/(TW/2))/2)};}
+
+function seedWorld(){
+  resources.length=0;mobs.length=0;
+  const occ=new Set(),k=(x,y)=>x+','+y; occ.add(k(MARKET.x,MARKET.y));
+  for(const t of towns) occ.add(k(t.x,t.y));
+  const free=(pred)=>{for(let i=0;i<400;i++){const x=(Math.random()*MAP)|0,y=(Math.random()*MAP)|0;
+    if(!inB(x,y)||tiles[y][x]!==0||occ.has(k(x,y)))continue; if(pred&&!pred(x,y))continue; occ.add(k(x,y));return{x,y};}return null;};
+  for(let i=0;i<26;i++){const s=free();if(s)resources.push({type:'tree',x:s.x,y:s.y,hp:3,maxHp:3,dead:false,respawn:0});}
+  for(let i=0;i<18;i++){const s=free();if(s)resources.push({type:'rock',x:s.x,y:s.y,hp:4,maxHp:4,dead:false,respawn:0});}
+  for(let i=0;i<11;i++){const s=free((x,y)=>Math.abs(x-SPAWN.x)+Math.abs(y-SPAWN.y)>4);if(s)mobs.push(mkMob(s.x,s.y));}
+}
+function mkMob(x,y){return{x,y,px:isoX(x,y),py:isoY(x,y),hp:24,maxHp:24,dead:false,respawn:0,cd:0,wander:0};}
+
+/* ===================== WORKERS (auto-gatherers, AoE villager style) ===================== */
+function homeTown(){return towns.find(t=>t.home)||towns.find(t=>t.owner==='player')||{x:SPAWN.x,y:SPAWN.y};}
+function spawnWorker(){const h=homeTown();const s=adjWalk(h.x,h.y,h.x,h.y)||{x:SPAWN.x,y:SPAWN.y};
+  workers.push({x:s.x,y:s.y,px:isoX(s.x,s.y),py:isoY(s.x,s.y),path:[],target:null,actCd:0});}
+function nearestResource(x,y){let best=null,bd=1e9;for(const r of resources){if(r.dead)continue;
+  const d=Math.abs(r.x-x)+Math.abs(r.y-y);if(d<bd){bd=d;best=r;}}return best;}
+function updateWorkers(dt){
+  for(const w of workers){
+    w.actCd-=dt; stepAlong(w,dt,BASE_SPD*0.9);
+    if(w.path&&w.path.length)continue;
+    if(!w.target||w.target.dead){w.target=nearestResource(w.x,w.y);
+      if(w.target){const s=adjWalk(w.target.x,w.target.y,w.x,w.y);if(s){const p=findPath(w.x,w.y,s.x,s.y);if(p)w.path=p;}}continue;}
+    if(isAdj(w.x,w.y,w.target.x,w.target.y)){ if(w.actCd<=0){w.actCd=0.9;
+      const r=w.target; r.hp--; if(r.type==='tree')player.inv.wood++;else player.inv.stone++;
+      player.gold+=1; burst(isoX(r.x,r.y),isoY(r.x,r.y),r.type==='tree'?'#7ee07a':'#c9d2dc',4);
+      refreshInv();refreshTop(); if(r.hp<=0){r.dead=true;r.respawn=8;w.target=null;} } }
+    else { const s=adjWalk(w.target.x,w.target.y,w.x,w.y); if(s){const p=findPath(w.x,w.y,s.x,s.y);if(p)w.path=p; else w.target=null;} else w.target=null; }
+  }
+}
+function hireWorker(){
+  if(workers.length>=workerCap()){toast('Worker cap '+workerCap()+' — level up for more','bad');return;}
+  const cost=40+workers.length*25;
+  if(!wallet.admin&&player.gold<cost){toast('Need '+cost+' CP to hire','bad');return;}
+  if(!wallet.admin)player.gold-=cost;
+  spawnWorker(); refreshTop(); refreshEmpire(); if(warOpenTown)renderWar();
+  toast('👷 Worker hired'+(wallet.admin?' (admin)':' (-'+cost+' CP)'),'good');
+}
+
+/* ===================== WALLS + TERRITORY ===================== */
+function buildWall(t){
+  if(t.wall>=4){toast('Wall maxed','bad');return;}
+  const cost={wood:15+t.wall*10,stone:12+t.wall*8,cp:30+t.wall*25};
+  if(!wallet.admin&&(player.inv.wood<cost.wood||player.inv.stone<cost.stone||player.gold<cost.cp)){toast('Not enough materials for the wall','bad');return;}
+  if(!wallet.admin){player.inv.wood-=cost.wood;player.inv.stone-=cost.stone;player.gold-=cost.cp;}
+  t.wall++; t.maxHp+=40; t.hp+=40;
+  refreshTop();refreshInv();renderWar(); toast('🧱 '+t.name+' wall → level '+t.wall,'good');
+}
+// territory control: which town's zone a tile belongs to (nearest within radius)
+function zoneOwner(x,y){let best=null,bd=TERR_R+0.01;
+  for(const t of towns){const d=Math.hypot(t.x-x,t.y-y);if(d<=TERR_R&&d<bd){bd=d;best=t;}}return best;}
+seedWorld();
+
+// ---- pathfinding ----
+function findPath(sx,sy,tx,ty){
+  if(!inB(tx,ty)||tileBlockedForPath(tx,ty))return null;
+  const open=[{x:sx,y:sy,g:0,f:0,p:null}],seen=new Map(),k=(x,y)=>x+','+y;seen.set(k(sx,sy),0);
+  const D=[[1,0],[-1,0],[0,1],[0,-1]];let guard=0;
+  while(open.length&&guard++<6000){open.sort((a,b)=>a.f-b.f);const c=open.shift();
+    if(c.x===tx&&c.y===ty){const p=[];let n=c;while(n.p){p.push({x:n.x,y:n.y});n=n.p;}return p.reverse();}
+    for(const[dx,dy]of D){const nx=c.x+dx,ny=c.y+dy;if(!inB(nx,ny)||tileBlockedForPath(nx,ny))continue;
+      const ng=c.g+1;if(seen.has(k(nx,ny))&&seen.get(k(nx,ny))<=ng)continue;seen.set(k(nx,ny),ng);
+      open.push({x:nx,y:ny,g:ng,f:ng+Math.abs(nx-tx)+Math.abs(ny-ty),p:c});}}
+  return null;
+}
+function adjWalk(gx,gy,fx,fy){const c=[[gx+1,gy],[gx-1,gy],[gx,gy+1],[gx,gy-1]]
+  .filter(([x,y])=>inB(x,y)&&!tileBlockedForPath(x,y));
+  c.sort((a,b)=>(Math.abs(a[0]-fx)+Math.abs(a[1]-fy))-(Math.abs(b[0]-fx)+Math.abs(b[1]-fy)));
+  return c[0]?{x:c[0][0],y:c[0][1]}:null;}
+const isAdj=(ax,ay,bx,by)=>Math.abs(ax-bx)+Math.abs(ay-by)===1;
+
+// ---- input ----
+let hover={x:-1,y:-1};
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();hover=screenToTile(e.clientX-r.left,e.clientY-r.top);});
+cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const t=screenToTile(e.clientX-r.left,e.clientY-r.top);handleClick(t.x,t.y);});
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(0.6,Math.min(1.8,zoom-Math.sign(e.deltaY)*0.1));},{passive:false});
+cv.addEventListener('touchstart',e=>{const r=cv.getBoundingClientRect();const tch=e.touches[0];const t=screenToTile(tch.clientX-r.left,tch.clientY-r.top);handleClick(t.x,t.y);},{passive:true});
+
+function handleClick(gx,gy){
+  if(!started||!inB(gx,gy))return;
+  if(control&&control!==player){ // moving a scout: just travel + reveal fog
+    const sc=control, dest=tileBlockedForPath(gx,gy)?adjWalk(gx,gy,sc.x,sc.y):{x:gx,y:gy};
+    if(dest){const p=findPath(sc.x,sc.y,dest.x,dest.y); if(p)sc.path=p;} return; }
+  if(gx===MARKET.x&&gy===MARKET.y){player.target={kind:'go',fx:gx,fy:gy,cb:openMarket};routeAdj(gx,gy);return;}
+  const tw=towns.find(t=>t.x===gx&&t.y===gy);
+  if(tw){
+    if(tw.owner==='enemy'){ player.target={kind:'keep',ref:tw}; routeAdj(gx,gy); }
+    else { player.target={kind:'go',fx:gx,fy:gy,cb:()=>onTownReach(tw)}; routeAdj(gx,gy); }
+    return; }
+  const res=resources.find(r=>!r.dead&&r.x===gx&&r.y===gy);
+  if(res){player.target={kind:'res',ref:res};routeAdj(gx,gy);return;}
+  const mob=mobs.find(m=>!m.dead&&m.x===gx&&m.y===gy);
+  if(mob){player.target={kind:'mob',ref:mob};routeAdj(mob.x,mob.y);return;}
+  if(tiles[gy][gx]===1){player.target={kind:'fish',fx:gx,fy:gy};routeAdj(gx,gy);return;}
+  player.target=null;const p=findPath(player.x,player.y,gx,gy);if(p)player.path=p;
+}
+function routeAdj(gx,gy){if(isAdj(player.x,player.y,gx,gy)){player.path=[];return;}
+  const s=adjWalk(gx,gy,player.x,player.y);if(s){const p=findPath(player.x,player.y,s.x,s.y);if(p)player.path=p;}}
+function onTownReach(t){ if(t.owner==='player') openWar(t);
+  else if(t.owner==='neutral') claimTown(t); }
+
+// ---- update ----
+let last=performance.now();
+function update(dt){
+  const z=zoneOwner(player.x,player.y), hostile=z&&z.owner!=='player';
+  let pspd=BASE_SPD*((BOOTS[player.boots]||BOOTS.none).mult); if(hostile)pspd*=0.5;
+  player.moving=stepAlong(player,dt,pspd);
+  if(hostile){player.terrCd=(player.terrCd||0)-dt; if(player.terrCd<=0){player.terrCd=1.3;damagePlayer(4);}}
+  for(const sc of scouts) stepAlong(sc,dt,BASE_SPD*1.6);
+  updateWorkers(dt);
+  computeFog();
+
+  player.actCd-=dt;player.hurtCd-=dt;
+  if(player.target&&!player.moving){const t=player.target;
+    if(t.kind==='go'){if(isAdj(player.x,player.y,t.fx,t.fy)){t.cb&&t.cb();player.target=null;}else if(!player.path.length)routeAdj(t.fx,t.fy);}
+    else if(t.kind==='res'&&!t.ref.dead&&isAdj(player.x,player.y,t.ref.x,t.ref.y)){if(player.actCd<=0){player.actCd=0.55;gather(t.ref);}}
+    else if(t.kind==='fish'&&isAdj(player.x,player.y,t.fx,t.fy)){if(player.actCd<=0){player.actCd=0.8;doFish();}}
+    else if(t.kind==='mob'&&!t.ref.dead&&isAdj(player.x,player.y,t.ref.x,t.ref.y)){if(player.actCd<=0){player.actCd=0.5;attack(t.ref);}}
+    else if(t.kind==='mob'&&!t.ref.dead&&!player.path.length){routeAdj(t.ref.x,t.ref.y);}
+    else if(t.kind==='keep'&&t.ref.owner==='enemy'&&isAdj(player.x,player.y,t.ref.x,t.ref.y)){if(player.actCd<=0){player.actCd=0.55;attackKeep(t.ref);}}
+    else if(t.kind==='keep'&&t.ref.owner==='enemy'&&!player.path.length){routeAdj(t.ref.x,t.ref.y);}
+  }
+
+  for(const m of mobs){
+    if(m.dead){m.respawn-=dt;if(m.respawn<=0){const s=randSpot();if(s){m.x=s.x;m.y=s.y;m.px=isoX(s.x,s.y);m.py=isoY(s.x,s.y);m.hp=m.maxHp;m.dead=false;}}continue;}
+    const tx=isoX(m.x,m.y),ty=isoY(m.x,m.y);m.px+=(tx-m.px)*Math.min(1,dt*8);m.py+=(ty-m.py)*Math.min(1,dt*8);
+    m.cd-=dt;m.wander-=dt;const dist=Math.abs(m.x-player.x)+Math.abs(m.y-player.y);
+    if(dist===1){if(m.cd<=0){m.cd=1.1;damagePlayer(6);}}
+    else if(dist<=4){if(m.wander<=0){m.wander=0.45;const s=adjWalk(player.x,player.y,m.x,m.y);stepMob(m,s?s.x:player.x,s?s.y:player.y);}}
+    else{if(m.wander<=0){m.wander=1.2+Math.random();const D=[[1,0],[-1,0],[0,1],[0,-1]],[dx,dy]=D[(Math.random()*4)|0];stepMob(m,m.x+dx,m.y+dy);}}
+  }
+  for(const r of resources){if(r.dead){r.respawn-=dt;if(r.respawn<=0){r.dead=false;r.hp=r.maxHp;}}}
+
+  updateWar(dt);
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;p.vy+=140*dt;p.px+=p.vx*dt;p.py+=p.vy*dt;if(p.life<=0)particles.splice(i,1);}
+  if(player.comboT>0){player.comboT-=dt;if(player.comboT<=0)player.combo=0;}
+  if(flash>0)flash-=dt*2;
+}
+function stepMob(m,nx,ny){if(!inB(nx,ny)||tileBlockedForPath(nx,ny))return;if(Math.abs(nx-m.x)+Math.abs(ny-m.y)!==1)return;if(nx===player.x&&ny===player.y)return;m.x=nx;m.y=ny;}
+function stepAlong(u,dt,spd){ if(!u.path||!u.path.length)return false;
+  const n=u.path[0],tx=isoX(n.x,n.y),ty=isoY(n.x,n.y),dx=tx-u.px,dy=ty-u.py,d=Math.hypot(dx,dy),s=spd*dt;
+  if(d<=s){u.px=tx;u.py=ty;u.x=n.x;u.y=n.y;u.path.shift();}else{u.px+=dx/d*s;u.py+=dy/d*s;}
+  return true; }
+function reveal(cx,cy,r){for(let y=Math.max(0,cy-r);y<=Math.min(MAP-1,cy+r);y++)for(let x=Math.max(0,cx-r);x<=Math.min(MAP-1,cx+r);x++){
+  if((x-cx)**2+(y-cy)**2<=r*r){visible[y][x]=true;explored[y][x]=true;}}}
+function computeFog(){for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++)visible[y][x]=false;
+  reveal(player.x,player.y,5);
+  for(const t of towns) if(t.owner==='player') reveal(t.x,t.y,6);
+  for(const sc of scouts) reveal(sc.x,sc.y,5);
+  for(const w of workers) reveal(w.x,w.y,3);}
+function randSpot(){for(let i=0;i<120;i++){const x=(Math.random()*MAP)|0,y=(Math.random()*MAP)|0;
+  if(inB(x,y)&&tiles[y][x]===0&&!tileBlockedForPath(x,y)&&(Math.abs(x-player.x)+Math.abs(y-player.y))>6)return{x,y};}return null;}
+
+/* ===================== WAR SYSTEM ===================== */
+let waveTimer=28, waveNum=0;
+function ownedTowns(){return towns.filter(t=>t.owner==='player');}
+function updateWar(dt){
+  // passive income + training
+  let perSec=0;
+  for(const t of ownedTowns()){
+    perSec += INCOME_BASE + (t.barracks?INCOME_BARRACKS:0);
+    if(t.q>0){ t.qt-=dt; if(t.qt<=0){ t.soldiers++; t.q--; t.qt = t.q>0?SOLDIER_TIME:0; spawnFloatPx(t.x,t.y,'+1 ⚔','#9fe3ff'); refreshEmpire(); if(warOpenTown===t) renderWar(); } }
+  }
+  player.incAcc += perSec*dt;
+  if(player.incAcc>=1){ const add=Math.floor(player.incAcc); player.gold+=add; player.incAcc-=add; refreshTop(); }
+
+  // spawn waves
+  if(ownedTowns().length>0){
+    waveTimer-=dt;
+    if(waveTimer<=0){ spawnWave(); waveTimer=Math.max(16, 30-waveNum*1.2); }
+  }
+  // armies march & siege
+  let incoming=null;
+  for(let i=armies.length-1;i>=0;i--){const a=armies[i];const t=a.town;
+    const tx=isoX(t.x,t.y),ty=isoY(t.x,t.y);const dx=tx-a.px,dy=ty-a.py,d=Math.hypot(dx,dy);
+    if(t.owner!=='player'){armies.splice(i,1);continue;} // town fell elsewhere
+    if(d>34){ a.px+=dx/d*40*dt; a.py+=dy/d*40*dt; incoming=t.name; }
+    else { incoming=t.name; a.battle-=dt;
+      if(a.battle<=0){ a.battle=0.6; resolveSiege(a,t,i); }
+    }
+  }
+  const warnEl=document.getElementById('warn');
+  if(incoming){warnEl.classList.add('show');document.getElementById('warnTown').textContent=incoming;}
+  else warnEl.classList.remove('show');
+}
+function spawnWave(){
+  const mine=ownedTowns(); if(!mine.length)return;
+  waveNum++;
+  const t=mine[(Math.random()*mine.length)|0];
+  const edges=[{x:0,y:0},{x:MAP-1,y:0},{x:0,y:MAP-1},{x:MAP-1,y:MAP-1}];
+  const e=edges[(Math.random()*edges.length)|0];
+  const count=4+waveNum+player.level;
+  armies.push({town:t,count,px:isoX(e.x,e.y),py:isoY(e.x,e.y),battle:0.6});
+  toast('⚔ Wave '+waveNum+' marching on '+t.name,'bad');
+}
+function resolveSiege(a,t,idx){
+  if(t.soldiers>0){
+    const kills=Math.max(1,Math.ceil(t.soldiers*0.7)+t.wall*2);   // wall boosts defenders
+    a.count-=kills; spawnFloatPx(t.x,t.y,'-'+kills,'#ff9a9a');
+    const losses=Math.max(0,Math.ceil(a.count*0.18));
+    if(losses>0){t.soldiers=Math.max(0,t.soldiers-losses);spawnFloatPx(t.x,t.y,'-'+losses+'⚔','#ffd27a');}
+  } else {
+    const dmg=Math.max(1,Math.ceil(a.count*2/(1+t.wall)));        // wall absorbs damage
+    t.hp-=dmg; spawnFloatPx(t.x,t.y,'-'+dmg,'#ff5b5b');
+  }
+  if(a.count<=0){ // defensa exitosa
+    const reward=28+waveNum*9; player.dit+=reward;
+    spawnFloatPx(t.x,t.y,'+'+reward+' $DITCOIN','#ffcb45');
+    toast('🛡 '+t.name+' held! +'+reward+' $DITCOIN','good');
+    armies.splice(idx,1); refreshTop(); onGoal('defend',1);
+  } else if(t.hp<=0){ // pueblo perdido
+    t.owner='enemy'; t.soldiers=0; t.barracks=false; t.hp=t.maxHp; t.q=0;
+    toast('💀 You lost '+t.name,'bad'); armies.splice(idx,1);
+    refreshEmpire(); if(warOpenTown===t) closeWar();
+  }
+  refreshEmpire(); if(warOpenTown===t&&document.getElementById('war').classList.contains('open')) renderWar();
+}
+
+// town actions
+function claimTown(t){
+  const cost=CLAIM_COST(ownedTowns().length);
+  if(player.gold<cost){toast('Need '+cost+' CP to claim','bad');return;}
+  player.gold-=cost; t.owner='player'; t.hp=t.maxHp; t.soldiers=Math.max(t.soldiers,1);
+  toast('🏴 Claimed '+t.name+(cost?(' (-'+cost+' CP)'):' (free)'),'good');
+  refreshTop();refreshEmpire(); openWar(t);
+}
+function attackKeep(t){
+  const wb=(WEAPONS[player.weapon]||{}).dmg||0;
+  const dmg=Math.max(2,Math.ceil((6+player.level*2+wb)/(1+t.wall*0.5)))+((Math.random()*4)|0);
+  t.hp-=dmg; spawnFloatPx(t.x,t.y,'-'+dmg,'#ff8a8a'); shake=4;
+  if(t.soldiers>0&&Math.random()<0.4){damagePlayer(5);}      // garrison strikes back
+  if(t.hp<=0) conquerTown(t);
+}
+function conquerTown(t){
+  t.owner='player'; t.soldiers=2; t.hp=t.maxHp; t.q=0; t.wall=Math.max(1,t.wall-1);
+  player.dit+=50; flash=1; burst(isoX(t.x,t.y),isoY(t.x,t.y),'#ffd24a',46);
+  player.target=null; refreshTop(); refreshEmpire(); renderControl();
+  toast('🏰 Conquered '+t.name+'! +50 $DITCOIN','good'); openWar(t);
+}
+function buildBarracks(t){
+  const c=BARRACKS_COST;
+  if(player.inv.wood<c.wood||player.inv.stone<c.stone||player.gold<c.dit){toast('Not enough resources for the barracks','bad');return;}
+  player.inv.wood-=c.wood;player.inv.stone-=c.stone;player.gold-=c.dit;
+  t.barracks=true; toast('🏰 Barracks built in '+t.name,'good');
+  refreshTop();refreshInv();refreshEmpire();renderWar();
+}
+function trainSoldier(t,n){ for(let i=0;i<n;i++){ if(player.gold<SOLDIER_COST.dit){toast('Not enough CP to recruit','bad');break;}
+    player.gold-=SOLDIER_COST.dit; t.q++; if(t.qt<=0)t.qt=SOLDIER_TIME; }
+  refreshTop();refreshEmpire();renderWar(); }
+
+/* ===================== mechanics ===================== */
+function gather(res){res.hp--;burst(isoX(res.x,res.y),isoY(res.x,res.y),res.type==='tree'?'#7ee07a':'#c9d2dc',6);if(res.type==='tree'){player.inv.wood++;spawnFloatPx(res.x,res.y,'+1 🪵','#ffe08a');}else{player.inv.stone++;spawnFloatPx(res.x,res.y,'+1 🪨','#ffe08a');}
+  gainXp(1);refreshInv();onGoal('gather',1);if(res.hp<=0){res.dead=true;res.respawn=8;player.target=null;}}
+function doFish(){if(Math.random()<0.7){player.inv.fish++;spawnFloatPx(player.x,player.y,'+1 🐟','#8fe3ff');gainXp(1);refreshInv();onGoal('gather',1);}else spawnFloatPx(player.x,player.y,'...','#8aa0b6');}
+function attack(mob){const wb=(WEAPONS[player.weapon]||{}).dmg||0;const dmg=6+player.level*2+wb+((Math.random()*4)|0);mob.hp-=dmg;spawnFloatPx(mob.x,mob.y,'-'+dmg,'#ff8a8a');
+  if(mob.hp<=0){mob.dead=true;mob.respawn=6;addCombo();const r=(8+((Math.random()*8)|0))+player.combo*2;player.gold+=r;spawnFloatPx(mob.x,mob.y,'+'+r+' CP','#ffe08a');burst(mob.px,mob.py,'#ffcb45',12);gainXp(6);player.target=null;refreshTop();onGoal('kill',1);}}
+function damagePlayer(d){if(player.hurtCd>0)return;player.hurtCd=0.4;player.hp-=d;spawnFloatPx(player.x,player.y,'-'+d,'#ff5b5b');shake=6;refreshTop();
+  if(player.hp<=0){const lost=Math.floor(player.gold*0.1);player.gold-=lost;player.hp=player.maxHp;player.x=SPAWN.x;player.y=SPAWN.y;player.px=isoX(SPAWN.x,SPAWN.y);player.py=isoY(SPAWN.x,SPAWN.y);player.path=[];player.target=null;toast('You fell. -'+lost+' CP','bad');refreshTop();}}
+function gainXp(n){player.xp+=n;while(player.xp>=player.xpNext){player.xp-=player.xpNext;player.level++;player.xpNext=Math.floor(player.xpNext*1.7);player.maxHp+=20;player.hp=player.maxHp;player.dit+=5;flash=1;burst(player.px,player.py,'#9fe3ff',30);toast('⭐ Level '+player.level+'! +5 $DITCOIN','good');}refreshTop();}
+function spawnFloatPx(gx,gy,txt,col){floats.push({px:isoX(gx,gy),py:isoY(gx,gy)-20,txt,col,t:1});}
+function burst(px,py,col,n){for(let i=0;i<n;i++){const a=Math.random()*6.28,sp=20+Math.random()*70;
+  particles.push({px,py:py-14,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-30,life:0.6+Math.random()*0.5,col,r:1.5+Math.random()*2.5});}}
+function addCombo(){player.combo++;player.comboT=2.2;if(player.combo>=3)spawnFloatPx(player.x,player.y,'COMBO x'+player.combo,'#ffd24a');}
+
+/* ===================== HUD ===================== */
+function refreshTop(){document.getElementById('lvl').textContent='Lv '+player.level;
+  document.getElementById('xpFill').style.width=(player.xp/player.xpNext*100)+'%';
+  document.getElementById('hpFill').style.width=(Math.max(0,player.hp)/player.maxHp*100)+'%';
+  document.getElementById('hpVal').textContent=Math.max(0,player.hp)+'/'+player.maxHp;
+  document.getElementById('cpVal').textContent=player.gold;
+  document.getElementById('ditVal').textContent=player.dit;
+  document.getElementById('solVal').textContent=(player.sol||0).toFixed(2);}
+function refreshInv(){for(const k of['wood','stone','fish']){document.getElementById(k).textContent=player.inv[k];}
+  const mw=document.getElementById('mWood');if(mw){mw.textContent=player.inv.wood;document.getElementById('mStone').textContent=player.inv.stone;document.getElementById('mFish').textContent=player.inv.fish;}}
+function refreshEmpire(){const own=ownedTowns();let inc=0,sol=0;for(const t of own){inc+=INCOME_BASE+(t.barracks?INCOME_BARRACKS:0);sol+=t.soldiers;}
+  document.getElementById('townCount').textContent=own.length;
+  document.getElementById('incRate').textContent=Math.round(inc*60)+'/min';
+  document.getElementById('armyCount').textContent=sol;}
+let toastWrap=document.getElementById('toasts');
+function toast(m,c){const d=document.createElement('div');d.className='toast '+(c||'');d.textContent=m;toastWrap.appendChild(d);setTimeout(()=>d.remove(),2400);}
+
+/* ===================== market ===================== */
+const marketEl=document.getElementById('market');
+function openMarket(){refreshInv();marketEl.classList.add('open');}
+document.getElementById('closeMarket').onclick=()=>marketEl.classList.remove('open');
+marketEl.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>{const k=b.dataset.sell,q=player.inv[k];if(q<=0)return;
+  const e=q*PRICES[k];player.gold+=e;player.inv[k]=0;refreshInv();refreshTop();toast('+'+e+' CP','gold');});
+
+/* ===================== war modal ===================== */
+const warEl=document.getElementById('war'); let warOpenTown=null;
+function openWar(t){warOpenTown=t;warEl.classList.add('open');renderWar();}
+function closeWar(){warEl.classList.remove('open');warOpenTown=null;}
+function renderWar(){
+  const t=warOpenTown; if(!t){closeWar();return;}
+  const c=BARRACKS_COST;
+  const canBarr=player.inv.wood>=c.wood&&player.inv.stone>=c.stone&&player.gold>=c.dit;
+  const m=document.getElementById('warModal');
+  m.innerHTML=`
+    <h3>🏰 ${t.name}</h3>
+    <p>Town under your banner. Train soldiers to survive the waves.</p>
+    <div class="townhp"><i style="width:${Math.max(0,t.hp)/t.maxHp*100}%"></i></div>
+    <div class="warrow">🛡 Garrison <b style="margin-left:6px">${t.soldiers}</b> soldiers
+      ${t.q>0?`<span class="cost" style="margin-left:8px">(training ${t.q}…)</span>`:''}</div>
+    <div class="warrow">💰 Income <b style="margin-left:6px">${Math.round((INCOME_BASE+(t.barracks?INCOME_BARRACKS:0))*60)}</b> CP/min</div>
+    ${ t.barracks
+      ? `<div class="warrow">⚔ Recruit soldier <span class="cost">${SOLDIER_COST.dit} CP · ${SOLDIER_TIME}s</span>
+           <span class="ml">
+             <button class="btn blue" id="t1" ${player.gold<SOLDIER_COST.dit?'disabled':''}>x1</button>
+             <button class="btn blue" id="t5" ${player.gold<SOLDIER_COST.dit*5?'disabled':''}>x5</button>
+           </span></div>`
+      : `<div class="warrow">🏰 Build barracks
+           <span class="cost">${c.wood}🪵 ${c.stone}🪨 ${c.dit} CP</span>
+           <span class="ml"><button class="btn" id="bb" ${canBarr?'':'disabled'}>Build</button></span></div>` }
+    <div class="warrow">🧱 Wall <b style="margin-left:6px">Lv ${t.wall}</b>
+      <span class="cost" style="margin-left:8px">${15+t.wall*10}🪵 ${12+t.wall*8}🪨 ${30+t.wall*25} CP</span>
+      <span class="ml"><button class="btn" id="wl" ${t.wall>=4?'disabled':''}>${t.wall>=4?'MAX':'Build'}</button></span></div>
+    <div class="warrow">👷 Gatherers <b style="margin-left:6px">${workers.length}/${workerCap()}</b>
+      <span class="cost" style="margin-left:8px">${40+workers.length*25} CP · cap +1/level</span>
+      <span class="ml"><button class="btn blue" id="hw" ${workers.length>=workerCap()?'disabled':''}>Hire</button></span></div>
+    <div class="warrow">🔭 Send scout <span class="cost">explore the map · costs 1 soldier</span>
+      <span class="ml"><button class="btn blue" id="sc" ${t.soldiers<=0?'disabled':''}>Send</button></span></div>
+    <button class="closebtn" id="cw">CLOSE</button>
+    <div class="controls">Walls boost defense. Gatherers auto-farm wood & stone. Conquer enemy keeps by attacking them (click the red town).</div>`;
+  m.querySelector('#cw').onclick=closeWar;
+  m.querySelector('#sc').onclick=()=>dispatchScout(t);
+  m.querySelector('#wl').onclick=()=>buildWall(t);
+  m.querySelector('#hw').onclick=()=>hireWorker();
+  if(t.barracks){m.querySelector('#t1').onclick=()=>trainSoldier(t,1);m.querySelector('#t5').onclick=()=>trainSoldier(t,5);}
+  else m.querySelector('#bb').onclick=()=>buildBarracks(t);
+}
+
+/* ===================== SHOP (weapons + outfits) ===================== */
+const shopEl=document.getElementById('shop');
+document.getElementById('shopBtn').onclick=openShop;
+function openShop(){shopEl.classList.add('open');renderShop();}
+function closeShop(){shopEl.classList.remove('open');}
+function buyOrEquip(cat,id){
+  const OWN={weapon:'weapons',outfit:'outfits',boots:'boots'}[cat];
+  const CAT={weapon:WEAPONS,outfit:OUTFITS,boots:BOOTS}[cat];
+  const data=CAT[id], ownedList=player.owned[OWN];
+  if(ownedList.includes(id)){ player[cat]=id; toast('Equipped '+data.name,'good'); renderShop(); return; }
+  if(wallet.admin){ ownedList.push(id); player[cat]=id; toast('👑 Admin unlock: '+data.name,'good'); renderShop(); return; }
+  if(!wallet.connected){ toast('Connect Phantom to buy','bad'); return; }
+  if(data.sol<=0){ ownedList.push(id); player[cat]=id; renderShop(); return; }
+  payWithSol(data.sol, data.name, ok=>{ if(!ok)return; ownedList.push(id); player[cat]=id;
+    if(data.legendary) burst(player.px,player.py,'#ffd24a',40);
+    toast('✅ Bought '+data.name+(SOL_CONFIG.live?'':' (test)'),'gold'); onGoal('buy',1); refreshTop(); renderShop(); });
+}
+function renderShop(){
+  const OWN={weapon:'weapons',outfit:'outfits',boots:'boots'};
+  const row=(cat,id,data,extra)=>{
+    const owned=player.owned[OWN[cat]].includes(id), equipped=player[cat]===id;
+    const label=equipped?'EQUIPPED':owned?'Equip':wallet.admin?'UNLOCK':(data.sol>0?('◎ '+data.sol+' SOL'):'Get');
+    const dis=equipped?'disabled':'';
+    return `<div class="sellrow ${data.legendary?'legend':''}"><span style="font-size:22px">${data.emoji||'🧥'}</span>
+      <span>${data.name}${data.legendary?' <span class="lgtag">LEGENDARY</span>':''}${extra?` <span class="cost">${extra}</span>`:''}</span>
+      <span class="ml" style="margin-left:auto"><button class="btn ${equipped?'':'blue'}" data-cat="${cat}" data-id="${id}" ${dis}>${label}</button></span></div>`;
+  };
+  const m=document.getElementById('shopModal');
+  m.innerHTML=`<h3>🛍 ACCESSORY SHOP</h3>
+    <p>${wallet.admin?'👑 Admin mode — everything free.':'Buy gear with <b>SOL</b> via Phantom.'+(SOL_CONFIG.live?'':' <span class="cost">(test mode — no transfer until configured)</span>')}</p>
+    <div class="cost" style="margin:-4px 0 8px">⚔️ WEAPONS</div>
+    ${Object.entries(WEAPONS).map(([id,d])=>row('weapon',id,d,'+'+d.dmg+' dmg')).join('')}
+    <div class="cost" style="margin:10px 0 8px">🥾 BOOTS — faster on the big map</div>
+    ${Object.entries(BOOTS).map(([id,d])=>row('boots',id,d,'x'+d.mult+' speed')).join('')}
+    <div class="cost" style="margin:10px 0 8px">🧥 HOODIES</div>
+    ${Object.entries(OUTFITS).map(([id,d])=>row('outfit',id,{...d,emoji:'🧥'},null)).join('')}
+    <button class="closebtn" id="cs">CLOSE</button>
+    <div class="controls">Real version: cosmetics become on-chain NFTs; the marketplace fee is the sustainable revenue.</div>`;
+  m.querySelector('#cs').onclick=closeShop;
+  m.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>buyOrEquip(b.dataset.cat,b.dataset.id));
+}
+// Real SOL payment via Phantom — safe demo by default (SOL_CONFIG.live=false).
+async function payWithSol(amount, label, cb){
+  if(!SOL_CONFIG.live || !SOL_CONFIG.recipient){ toast('💸 (test) '+amount+' SOL for '+label,'gold'); return cb(true); }
+  try{
+    const w3=await import('https://esm.sh/@solana/web3.js@1.95.3');
+    const conn=new w3.Connection(SOL_CONFIG.rpc,'confirmed');
+    const from=new w3.PublicKey(wallet.pubkey), to=new w3.PublicKey(SOL_CONFIG.recipient);
+    const tx=new w3.Transaction().add(w3.SystemProgram.transfer({fromPubkey:from,toPubkey:to,lamports:Math.round(amount*w3.LAMPORTS_PER_SOL)}));
+    tx.feePayer=from; tx.recentBlockhash=(await conn.getLatestBlockhash()).blockhash;
+    const sig=await window.solana.signAndSendTransaction(tx);
+    toast('Tx sent: '+String(sig.signature||sig).slice(0,8)+'…','good'); cb(true);
+  }catch(e){ toast('Payment cancelled','bad'); cb(false); }
+}
+
+/* ===================== CONTROL + SCOUTS (Age-of-Empires style) ===================== */
+function renderControl(){
+  const el=document.getElementById('control');
+  let h=`<button class="cbtn ${(!control||control===player)?'on':''}" data-ctl="hero">🦹 Hero</button>`;
+  scouts.forEach((sc,i)=>{h+=`<button class="cbtn ${control===sc?'on':''}" data-ctl="${i}">🔭 Scout ${i+1}</button>`;});
+  el.innerHTML=h;
+  el.querySelectorAll('[data-ctl]').forEach(b=>b.onclick=()=>{control=b.dataset.ctl==='hero'?player:scouts[+b.dataset.ctl];renderControl();});
+}
+function dispatchScout(t){
+  if(t.soldiers<=0){toast('No soldiers to send','bad');return;}
+  t.soldiers--; const spot=adjWalk(t.x,t.y,t.x,t.y)||{x:t.x,y:t.y};
+  const sc={x:spot.x,y:spot.y,px:isoX(spot.x,spot.y),py:isoY(spot.x,spot.y),path:[]};
+  scouts.push(sc); control=sc; refreshEmpire(); renderControl(); closeWar();
+  toast('🔭 Scout dispatched — click the map to explore','good');
+}
+
+/* ===================== DAILY GOALS (retention) ===================== */
+const GOAL_DEFS=[
+  {type:'gather',label:'Gather resources',need:12,reward:30},
+  {type:'kill',  label:'Defeat slimes',   need:6, reward:45},
+  {type:'defend',label:'Win town defenses',need:1, reward:70},
+];
+let goals=GOAL_DEFS.map(g=>({...g,prog:0,done:false}));
+function onGoal(type,n){let changed=false;
+  for(const g of goals){ if(g.type===type&&!g.done){ g.prog=Math.min(g.need,g.prog+n);
+    if(g.prog>=g.need){g.done=true;player.dit+=g.reward;burst(player.px,player.py,'#ffcb45',24);toast('🏆 Reward +'+g.reward+' $DITCOIN','gold');refreshTop();} changed=true; } }
+  if(changed) renderGoals();
+  if(goals.every(g=>g.done)){ // refresh harder set -> keeps the loop going
+    setTimeout(()=>{ goals=GOAL_DEFS.map(g=>({...g,need:Math.ceil(g.need*1.6),reward:Math.round(g.reward*1.5),prog:0,done:false}));
+      toast('🔄 New goals unlocked!','good'); renderGoals(); },900);
+  }
+}
+function renderGoals(){
+  document.getElementById('goalList').innerHTML=goals.map(g=>
+    `<div class="goal ${g.done?'done':''}">${g.done?'✓ ':''}${g.label} <span class="rw">+${g.reward}</span>
+      <div class="gb"><i style="width:${g.prog/g.need*100}%"></i></div>
+      <span style="font-size:13px;color:var(--muted)">${g.prog}/${g.need}</span></div>`).join('');
+}
+
+/* ===================== Phantom wallet + connect gate + admin ===================== */
+function short(a){return a.slice(0,4)+'…'+a.slice(-4);}
+async function connectPhantom(){
+  const prov=window.solana;
+  if(!prov||!prov.isPhantom){ window.open('https://phantom.app/','_blank'); toast('Install Phantom to play','bad'); return; }
+  try{
+    const res=await prov.connect();
+    wallet.connected=true; wallet.pubkey=res.publicKey.toString();
+    wallet.admin=ADMIN_WALLETS.includes(wallet.pubkey);
+    // read SOL balance (best-effort)
+    try{ const w3=await import('https://esm.sh/@solana/web3.js@1.95.3');
+      const conn=new w3.Connection(SOL_CONFIG.rpc,'confirmed');
+      const lam=await conn.getBalance(new w3.PublicKey(wallet.pubkey)); player.sol=lam/w3.LAMPORTS_PER_SOL; }catch(e){}
+    onWalletChange(); toast(wallet.admin?'👑 Admin wallet connected':'Wallet connected','good');
+  }catch(e){ toast('Connection rejected','bad'); }
+}
+function disconnectPhantom(){ try{window.solana&&window.solana.disconnect();}catch(e){} wallet.connected=false;wallet.pubkey='';wallet.admin=false;player.sol=0;onWalletChange(); }
+function onWalletChange(){
+  const b=document.getElementById('walletBtn'),dt=document.getElementById('gateDot'),tx=document.getElementById('gateText'),ab=document.getElementById('adminBadge');
+  if(wallet.connected){ b.textContent=short(wallet.pubkey); b.classList.add('connected'); dt.classList.add('ok');
+    tx.textContent=wallet.admin?'Admin':'Connected'; ab.style.display=wallet.admin?'inline-block':'none';
+    document.getElementById('gateOverlay').classList.remove('open'); started=true; }
+  else { b.textContent='Connect wallet'; b.classList.remove('connected'); dt.classList.remove('ok'); tx.textContent='Wallet not connected';
+    ab.style.display='none'; document.getElementById('gateOverlay').classList.add('open'); started=false; }
+  refreshTop();
+}
+let started=false;
+let sharedReward=false;
+document.getElementById('shareBtn').onclick=()=>{
+  const url='https://isditcoin.xyz', text='Playing DITCOIN REALM ⚔️ — conquer towns, earn $DITCOIN. Join me 👇';
+  window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank');
+  if(sharedReward){toast('Share reward already claimed','bad');return;}
+  sharedReward=true; player.dit+=5; flash=1; burst(player.px,player.py,'#7fdfff',30); refreshTop();
+  toast('🎁 +5 $DITCOIN for sharing! (server-verified in production)','good');
+};
+document.getElementById('walletBtn').onclick=()=>{ wallet.connected?disconnectPhantom():connectPhantom(); };
+document.getElementById('gateConnect').onclick=connectPhantom;
+document.getElementById('gateAdmin').onclick=()=>{ // local admin/dev play without a real wallet
+  wallet.connected=true; wallet.admin=true; wallet.pubkey='ADMIN_LOCAL'; player.sol=99; onWalletChange(); toast('👑 Admin (local) — for testing','good'); };
+
+/* ===================== render ===================== */
+let shake=0;
+function resize(){const r=cv.getBoundingClientRect();VW=r.width;VH=r.height;cv.width=VW*DPR;cv.height=VH*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+window.addEventListener('resize',resize);
+function diamond(cx,cy,fill,stroke){ctx.beginPath();ctx.moveTo(cx,cy-TH/2*zoom);ctx.lineTo(cx+TW/2*zoom,cy);ctx.lineTo(cx,cy+TH/2*zoom);ctx.lineTo(cx-TW/2*zoom,cy);ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
+const TILECOL={0:'#3f6b3a',1:'#2b6f8f',2:'#9a8456'};
+function draw(){
+  const cam=camera();ctx.clearRect(0,0,VW,VH);
+  const sx=cam.x+(shake>0?(Math.random()-.5)*shake:0), sy=cam.y+(shake>0?(Math.random()-.5)*shake:0);
+  if(shake>0)shake-=.6;
+  for(let y=0;y<MAP;y++)for(let x=0;x<MAP;x++){const cx=sx+isoX(x,y)*zoom,cy=sy+isoY(x,y)*zoom;
+    if(cx<-80||cx>VW+80||cy<-80||cy>VH+120)continue;
+    if(!explored[y][x]){diamond(cx,cy,'#070a0e','#00000022');continue;}
+    const hov=(x===hover.x&&y===hover.y);diamond(cx,cy,hov?lighten(TILECOL[tiles[y][x]]):TILECOL[tiles[y][x]],'#00000022');
+    if(tiles[y][x]===1){ctx.globalAlpha=.15;diamond(cx,cy-2*zoom,'#bfe9ff',null);ctx.globalAlpha=1;}
+    const zo=zoneOwner(x,y); if(zo){ctx.globalAlpha=.16;diamond(cx,cy,zo.owner==='player'?'#4ea1ff':zo.owner==='enemy'?'#ff5b5b':'#aab4c0',null);ctx.globalAlpha=1;}
+    if(!visible[y][x]){ctx.globalAlpha=.45;diamond(cx,cy,'#05070a',null);ctx.globalAlpha=1;}}
+  // Bitcoin emblem on the plaza floor
+  if(explored[BTC.y]&&explored[BTC.y][BTC.x]){const bx=sx+isoX(BTC.x,BTC.y)*zoom,by=sy+isoY(BTC.x,BTC.y)*zoom;
+    const pul=0.5+0.5*Math.sin(performance.now()/500);
+    ctx.save();ctx.globalAlpha=0.25+pul*0.25;ctx.fillStyle='#f7931a';ctx.beginPath();ctx.ellipse(bx,by,16*zoom,8*zoom,0,0,7);ctx.fill();ctx.restore();
+    ctx.fillStyle='#f7931a';ctx.font='bold '+(20*zoom)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor='#ffb84d';ctx.shadowBlur=(8+pul*10)*zoom;ctx.fillText('₿',bx,by-2*zoom);ctx.shadowBlur=0;ctx.textBaseline='alphabetic';}
+  const vis=(x,y)=>visible[y]&&visible[y][x], exp=(x,y)=>explored[y]&&explored[y][x];
+  const objs=[];objs.push({d:player.x+player.y,kind:'player'});
+  for(const r of resources)if(!r.dead&&exp(r.x,r.y))objs.push({d:r.x+r.y,kind:'res',ref:r});
+  for(const m of mobs)if(!m.dead&&vis(m.x,m.y))objs.push({d:(m.px+m.py)/((TW/2)+(TH/2)),kind:'mob',ref:m});
+  for(const t of towns)if(exp(t.x,t.y))objs.push({d:t.x+t.y,kind:'town',ref:t});
+  for(const a of armies)if(vis(a.town.x,a.town.y))objs.push({d:(a.px+a.py)/((TW/2)+(TH/2)),kind:'army',ref:a});
+  for(const sc of scouts)objs.push({d:(sc.px+sc.py)/((TW/2)+(TH/2)),kind:'scout',ref:sc});
+  for(const w of workers)objs.push({d:(w.px+w.py)/((TW/2)+(TH/2)),kind:'worker',ref:w});
+  if(exp(MARKET.x,MARKET.y))objs.push({d:MARKET.x+MARKET.y,kind:'market'});
+  objs.sort((a,b)=>a.d-b.d);
+  for(const o of objs){if(o.kind==='player')drawPlayer(sx,sy);else if(o.kind==='res')drawRes(sx,sy,o.ref);
+    else if(o.kind==='mob')drawMob(sx,sy,o.ref);else if(o.kind==='town')drawTown(sx,sy,o.ref);
+    else if(o.kind==='army')drawArmy(sx,sy,o.ref);else if(o.kind==='scout')drawScout(sx,sy,o.ref);
+    else if(o.kind==='worker')drawWorker(sx,sy,o.ref);else if(o.kind==='market')drawMarket(sx,sy);}
+  ctx.textAlign='center';ctx.font='16px VT323';
+  for(let i=floats.length-1;i>=0;i--){const f=floats[i];f.py-=.6;f.t-=.012;ctx.globalAlpha=Math.max(0,f.t);ctx.fillStyle=f.col;ctx.fillText(f.txt,sx+f.px*zoom,sy+f.py*zoom);ctx.globalAlpha=1;if(f.t<=0)floats.splice(i,1);}
+  for(const p of particles){ctx.globalAlpha=Math.max(0,Math.min(1,p.life*1.6));ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(sx+p.px*zoom,sy+p.py*zoom,p.r*zoom,0,7);ctx.fill();}
+  ctx.globalAlpha=1;
+  if(flash>0){ctx.fillStyle='rgba(255,255,255,'+(flash*0.35)+')';ctx.fillRect(0,0,VW,VH);}
+  if(player.combo>=3){ctx.textAlign='center';ctx.font='bold 26px VT323';ctx.fillStyle='#ffd24a';
+    ctx.globalAlpha=Math.min(1,player.comboT);ctx.fillText('COMBO x'+player.combo,VW/2,90);ctx.globalAlpha=1;}
+}
+function lighten(h){return shade(h,30);}
+function shade(h,a){const n=parseInt(h.slice(1),16);let r=(n>>16)+a,g=((n>>8)&255)+a,b=(n&255)+a;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');}
+function shadow(cx,cy,w){ctx.globalAlpha=.25;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(cx,cy,w*zoom,w*.5*zoom,0,0,7);ctx.fill();ctx.globalAlpha=1;}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function drawPlayer(sx,sy){const cx=sx+player.px*zoom,cy=sy+player.py*zoom;shadow(cx,cy,12);
+  const legend=(WEAPONS[player.weapon]||{}).legendary||(OUTFITS[player.outfit]||{}).legendary||(BOOTS[player.boots]||{}).legendary;
+  if(legend){const pul=0.5+0.5*Math.sin(performance.now()/300);ctx.save();ctx.globalAlpha=0.25+pul*0.3;
+    const g=ctx.createRadialGradient(cx,cy-20*zoom,2,cx,cy-20*zoom,30*zoom);g.addColorStop(0,'#c9a6ff');g.addColorStop(1,'#c9a6ff00');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy-20*zoom,30*zoom,0,7);ctx.fill();ctx.restore();}
+  const Z=zoom, bob=player.moving?Math.sin(performance.now()/90)*1.5*Z:0;
+  const purple='#7a3bd4', purpleD='#5d2aa8';
+  const hood=(OUTFITS[player.outfit]||OUTFITS.classic).color;
+  ctx.save(); ctx.translate(0,bob);
+  // legs + shorts
+  ctx.fillStyle=purpleD; rr(cx-7*Z,cy-12*Z,5*Z,12*Z,2*Z); ctx.fill(); rr(cx+2*Z,cy-12*Z,5*Z,12*Z,2*Z); ctx.fill();
+  ctx.fillStyle=shade(hood,16); rr(cx-8*Z,cy-19*Z,16*Z,9*Z,2*Z); ctx.fill();
+  // sleeves + purple hands
+  ctx.fillStyle=hood; rr(cx-13*Z,cy-29*Z,5*Z,13*Z,2*Z); ctx.fill(); rr(cx+8*Z,cy-29*Z,5*Z,13*Z,2*Z); ctx.fill();
+  ctx.fillStyle=purple; ctx.beginPath(); ctx.arc(cx-10.5*Z,cy-16*Z,2.6*Z,0,7); ctx.arc(cx+10.5*Z,cy-16*Z,2.6*Z,0,7); ctx.fill();
+  // hoodie torso
+  ctx.fillStyle=hood; rr(cx-9*Z,cy-31*Z,18*Z,17*Z,4*Z); ctx.fill();
+  ctx.strokeStyle=shade(hood,22); ctx.lineWidth=1*Z; ctx.beginPath(); ctx.moveTo(cx,cy-30*Z); ctx.lineTo(cx,cy-15*Z); ctx.stroke();
+  // glowing chest emblem
+  ctx.fillStyle='#d9c4ff'; ctx.shadowColor='#b06bff'; ctx.shadowBlur=6*Z; ctx.beginPath(); ctx.arc(cx,cy-23*Z,2.8*Z,0,7); ctx.fill(); ctx.shadowBlur=0;
+  // head
+  const hy=cy-39*Z;
+  ctx.fillStyle=purple;
+  ctx.beginPath(); // spiky crest
+  ctx.moveTo(cx-9*Z,hy-1*Z); ctx.lineTo(cx-11*Z,hy-12*Z); ctx.lineTo(cx-4*Z,hy-6*Z);
+  ctx.lineTo(cx-1*Z,hy-16*Z); ctx.lineTo(cx+3*Z,hy-6*Z); ctx.lineTo(cx+10*Z,hy-13*Z); ctx.lineTo(cx+9*Z,hy-1*Z);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx,hy,10*Z,8.5*Z,0,0,7); ctx.fill();            // skull
+  ctx.beginPath(); ctx.ellipse(cx-7*Z,hy+2*Z,4.5*Z,3.2*Z,0,0,7); ctx.fill();    // snout
+  // glowing white eye
+  ctx.fillStyle='#fff'; ctx.shadowColor='#ead9ff'; ctx.shadowBlur=7*Z;
+  ctx.beginPath(); ctx.ellipse(cx+1.5*Z,hy-1*Z,2.6*Z,3.6*Z,-0.5,0,7); ctx.fill(); ctx.shadowBlur=0;
+  // toothy grin
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(cx-3*Z,hy+4.5*Z,5.2*Z,2.6*Z,0,0,7); ctx.fill();
+  ctx.strokeStyle=purpleD; ctx.lineWidth=0.7*Z;
+  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(cx-3*Z+i*1.7*Z,hy+2.4*Z);ctx.lineTo(cx-3*Z+i*1.7*Z,hy+6.6*Z);ctx.stroke();}
+  ctx.restore();
+  // equipped weapon in right hand
+  const w=WEAPONS[player.weapon];
+  if(w && player.weapon!=='fists'){
+    ctx.save(); ctx.translate(cx+11*Z,cy-15*Z+bob); ctx.font=(15*Z)+'px serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(player.actCd>0) ctx.rotate(-0.4+Math.sin(performance.now()/40)*0.35);
+    ctx.fillText(w.emoji,0,0); ctx.restore(); ctx.textBaseline='alphabetic';
+  }
+  if(player.actCd>0){ctx.strokeStyle='#b06bff99';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(cx,cy,16*Z,9*Z,0,0,7);ctx.stroke();}}
+function drawRes(sx,sy,r){const cx=sx+isoX(r.x,r.y)*zoom,cy=sy+isoY(r.x,r.y)*zoom;shadow(cx,cy,14);
+  if(r.type==='tree'){ctx.fillStyle='#5a3b22';rr(cx-3*zoom,cy-18*zoom,6*zoom,18*zoom,2*zoom);ctx.fill();
+    ctx.fillStyle='#3f8a3a';ctx.beginPath();ctx.arc(cx,cy-24*zoom,14*zoom,0,7);ctx.fill();
+    ctx.fillStyle='#347a30';ctx.beginPath();ctx.arc(cx-7*zoom,cy-18*zoom,9*zoom,0,7);ctx.arc(cx+7*zoom,cy-19*zoom,9*zoom,0,7);ctx.fill();}
+  else{ctx.fillStyle='#6b7178';ctx.beginPath();ctx.moveTo(cx-14*zoom,cy);ctx.lineTo(cx-8*zoom,cy-16*zoom);ctx.lineTo(cx+6*zoom,cy-18*zoom);ctx.lineTo(cx+14*zoom,cy-4*zoom);ctx.lineTo(cx+10*zoom,cy+4*zoom);ctx.lineTo(cx-12*zoom,cy+4*zoom);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#878d94';ctx.beginPath();ctx.moveTo(cx-8*zoom,cy-16*zoom);ctx.lineTo(cx+6*zoom,cy-18*zoom);ctx.lineTo(cx+2*zoom,cy-6*zoom);ctx.lineTo(cx-6*zoom,cy-6*zoom);ctx.closePath();ctx.fill();}
+  if(r.hp<r.maxHp)barAbove(cx,cy-(r.type==='tree'?40:24)*zoom,r.hp/r.maxHp,'#ffcb45');}
+function drawMob(sx,sy,m){const cx=sx+m.px*zoom,cy=sy+m.py*zoom;shadow(cx,cy,11);
+  const sq=Math.sin(performance.now()/200+m.x)*2*zoom;ctx.fillStyle='#a05bff';ctx.beginPath();ctx.ellipse(cx,cy-8*zoom-sq*.2,12*zoom,12*zoom+sq,0,0,7);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx-4*zoom,cy-12*zoom,2.2*zoom,0,7);ctx.arc(cx+4*zoom,cy-12*zoom,2.2*zoom,0,7);ctx.fill();
+  ctx.fillStyle='#1a1206';ctx.beginPath();ctx.arc(cx-4*zoom,cy-12*zoom,1*zoom,0,7);ctx.arc(cx+4*zoom,cy-12*zoom,1*zoom,0,7);ctx.fill();
+  if(m.hp<m.maxHp)barAbove(cx,cy-26*zoom,m.hp/m.maxHp,'#ff5b5b');}
+function drawMarket(sx,sy){const cx=sx+isoX(MARKET.x,MARKET.y)*zoom,cy=sy+isoY(MARKET.x,MARKET.y)*zoom;shadow(cx,cy,20);
+  ctx.fillStyle='#7a5a17';rr(cx-18*zoom,cy-28*zoom,36*zoom,28*zoom,3*zoom);ctx.fill();
+  ctx.fillStyle='#ffcb45';ctx.beginPath();ctx.moveTo(cx-22*zoom,cy-26*zoom);ctx.lineTo(cx,cy-44*zoom);ctx.lineTo(cx+22*zoom,cy-26*zoom);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#241a08';rr(cx-6*zoom,cy-16*zoom,12*zoom,16*zoom,2*zoom);ctx.fill();
+  ctx.font=(11*zoom)+'px "Press Start 2P"';ctx.textAlign='center';ctx.fillText('🏪',cx,cy-30*zoom);}
+function drawTown(sx,sy,t){const cx=sx+isoX(t.x,t.y)*zoom,cy=sy+isoY(t.x,t.y)*zoom;shadow(cx,cy,22);
+  const col = t.owner==='player'?'#3a4a63':t.owner==='enemy'?'#5a2a2e':'#3a3f47';
+  const flag = t.owner==='player'?'#4ea1ff':t.owner==='enemy'?'#ff5b5b':'#aab4c0';
+  // wall ring (isometric diamond of stone blocks) scaled by wall level
+  if(t.wall>0){const rw=(30+t.wall*4)*zoom, rh=(15+t.wall*2)*zoom; ctx.fillStyle=shade(col,-22);
+    for(let a=0;a<Math.PI*2;a+=Math.PI/9){const wx=cx+Math.cos(a)*rw, wy=cy+6*zoom+Math.sin(a)*rh;
+      ctx.fillRect(wx-3*zoom,wy-6*zoom,6*zoom,7*zoom);}
+    ctx.strokeStyle=shade(col,-8);ctx.lineWidth=1*zoom;ctx.beginPath();ctx.ellipse(cx,cy+6*zoom,rw,rh,0,0,7);ctx.stroke();}
+  // keep
+  ctx.fillStyle=col;rr(cx-20*zoom,cy-30*zoom,40*zoom,30*zoom,3*zoom);ctx.fill();
+  ctx.fillStyle=shade(col,-14);for(let i=0;i<4;i++){ctx.fillRect(cx-20*zoom+i*11*zoom,cy-36*zoom,7*zoom,7*zoom);} // crenellations
+  // door
+  ctx.fillStyle='#1a1206';rr(cx-6*zoom,cy-15*zoom,12*zoom,15*zoom,2*zoom);ctx.fill();
+  // flag pole
+  ctx.strokeStyle='#cbd5e1';ctx.lineWidth=2*zoom;ctx.beginPath();ctx.moveTo(cx,cy-36*zoom);ctx.lineTo(cx,cy-54*zoom);ctx.stroke();
+  ctx.fillStyle=flag;ctx.beginPath();ctx.moveTo(cx,cy-54*zoom);ctx.lineTo(cx+16*zoom,cy-50*zoom);ctx.lineTo(cx,cy-46*zoom);ctx.closePath();ctx.fill();
+  // barracks annex
+  if(t.barracks){ctx.fillStyle='#5a4a30';rr(cx+16*zoom,cy-16*zoom,14*zoom,16*zoom,2*zoom);ctx.fill();
+    ctx.fillStyle='#caa24a';ctx.beginPath();ctx.moveTo(cx+15*zoom,cy-15*zoom);ctx.lineTo(cx+23*zoom,cy-23*zoom);ctx.lineTo(cx+31*zoom,cy-15*zoom);ctx.closePath();ctx.fill();}
+  // name + hp
+  ctx.font=(8*zoom)+'px "Press Start 2P"';ctx.textAlign='center';ctx.fillStyle=flag;ctx.fillText(t.name,cx,cy-58*zoom);
+  if(t.owner==='player'||t.owner==='enemy'){
+    if(t.hp<t.maxHp)barAbove(cx,cy-44*zoom,t.hp/t.maxHp,'#ff5b5b');
+    // garrison dots
+    const n=Math.min(t.soldiers,8);for(let i=0;i<n;i++){const a=i/8*6.28;ctx.fillStyle=t.owner==='player'?'#9fd0ff':'#ff9a9a';
+      ctx.beginPath();ctx.arc(cx+Math.cos(a)*24*zoom,cy+4*zoom+Math.sin(a)*10*zoom,2.4*zoom,0,7);ctx.fill();}
+    if(t.soldiers>0){ctx.font=(7*zoom)+'px "Press Start 2P"';ctx.fillStyle='#cbd5e1';ctx.fillText('⚔'+t.soldiers,cx,cy+18*zoom);}
+  }
+  if(t.owner==='neutral'){ctx.font=(7*zoom)+'px "Press Start 2P"';ctx.fillStyle='#aab4c0';ctx.fillText('⚐ claim',cx,cy+16*zoom);}}
+function drawArmy(sx,sy,a){const cx=sx+a.px*zoom,cy=sy+a.py*zoom;shadow(cx,cy,16);  const n=Math.min(a.count,7);for(let i=0;i<n;i++){const ox=((i%4)-1.5)*7*zoom,oy=((i/4|0)-.5)*6*zoom;
+    ctx.fillStyle='#ff5b5b';rr(cx+ox-3*zoom,cy+oy-12*zoom,6*zoom,12*zoom,2*zoom);ctx.fill();}
+  ctx.font=(8*zoom)+'px "Press Start 2P"';ctx.textAlign='center';ctx.fillStyle='#ff8a8a';ctx.fillText('⚔'+a.count,cx,cy-18*zoom);}
+function drawScout(sx,sy,sc){const cx=sx+sc.px*zoom,cy=sy+sc.py*zoom;shadow(cx,cy,9);
+  if(control===sc){ctx.strokeStyle='#5be07a';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(cx,cy,13*zoom,7*zoom,0,0,7);ctx.stroke();}
+  ctx.fillStyle='#4ea1ff';rr(cx-5*zoom,cy-19*zoom,10*zoom,15*zoom,3*zoom);ctx.fill();
+  ctx.fillStyle='#cfe6ff';ctx.beginPath();ctx.arc(cx,cy-22*zoom,4.5*zoom,0,7);ctx.fill();
+  ctx.font=(11*zoom)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🔭',cx,cy-22*zoom);ctx.textBaseline='alphabetic';
+  if(sc.path&&sc.path.length){ctx.fillStyle='#9fd0ff';ctx.font=(7*zoom)+'px "Press Start 2P"';ctx.fillText('scouting',cx,cy-30*zoom);}}
+function drawWorker(sx,sy,w){const cx=sx+w.px*zoom,cy=sy+w.py*zoom;shadow(cx,cy,8);
+  const bob=(w.path&&w.path.length)?Math.sin(performance.now()/100+w.px)*1.2*zoom:0;
+  ctx.fillStyle='#caa24a';rr(cx-4*zoom,cy-16*zoom+bob,8*zoom,13*zoom,2*zoom);ctx.fill();      // tunic
+  ctx.fillStyle='#7a3bd4';ctx.beginPath();ctx.arc(cx,cy-18*zoom+bob,3.6*zoom,0,7);ctx.fill();  // head
+  ctx.font=(9*zoom)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('⛏️',cx+6*zoom,cy-12*zoom+bob);ctx.textBaseline='alphabetic';}
+function barAbove(cx,cy,f,col){const w=28*zoom,h=4*zoom;ctx.fillStyle='#0a0e13';rr(cx-w/2,cy,w,h,2);ctx.fill();ctx.fillStyle=col;rr(cx-w/2,cy,w*f,h,2);ctx.fill();}
+
+/* ===================== loop ===================== */
+function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(started)update(dt);draw();requestAnimationFrame(loop);}
+resize();control=player;spawnWorker();spawnWorker();computeFog();refreshTop();refreshInv();refreshEmpire();renderGoals();renderControl();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
