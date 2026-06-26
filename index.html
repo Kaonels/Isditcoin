@@ -2388,7 +2388,7 @@ async function serverSave(data){ if(!SERVER.base||!serverAuthed)return;
 async function cloudSync(){ if(!SERVER.base)return; const ok=await serverSignIn(); if(ok){ await serverLoad(); } }
 
 // ---- ONLINE MULTIPLAYER (REAL — Socket.io) ----
-// Set MP_SERVER to your Railway URL, e.g. 'wss://ditcoin-server.up.railway.app'
+// Set MP_SERVER to your Railway URL, e.g. 'https://isditcoin.railway.app'
 const MP_SERVER = "https://isditcoin.railway.app";
 let realOnlineCount=0, mpConnected=false, _mpSocket=null;
 let mpId=null, mpRoomCode=null, _remotePlayers={};
